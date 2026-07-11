@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
@@ -14,8 +14,8 @@ class Transaction(BaseModel):
     category: str | None = None
     balance: int | None = None
     source_file: str
-    dedup_hash: str
     ingested_at: datetime = Field(default_factory=datetime.now)
+    dedup_hash: str = ""
 
     @staticmethod
     def from_raw_amount(raw: str) -> int:
@@ -29,3 +29,7 @@ class Transaction(BaseModel):
             payload += f"|{balance_part}"
         return hashlib.sha256(payload.encode('utf-8')).hexdigest()
     
+    @model_validator(mode="after")
+    def _set_dedup_hash(self) -> "Transaction":
+        self.dedup_hash = self.compute_dedup_hash()
+        return self
