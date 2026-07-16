@@ -32,7 +32,8 @@ e.g. `expense_reports/IslandFederal_checking/bank_statment/` and `expense_report
 - [x] `Transaction` model
 - [x] `StatementParser` interface + registry
 - [x] SQLite storage layer with idempotent inserts
-- [ ] Parsers for IslandFederal checking (bank statement + transaction history formats) — in progress
+- [x] `IslandFederalStatementParser` (official bank statement format)
+- [ ] Parser for IslandFederal checking transaction-history export format
 - [ ] Ingestion CLI
 - [ ] Categorization CLI (with merchant-rule auto-suggestion)
 - [ ] Spend analysis / reporting
