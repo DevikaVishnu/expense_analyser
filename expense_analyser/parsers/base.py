@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-
 from expense_analyser.models import Transaction
 
 

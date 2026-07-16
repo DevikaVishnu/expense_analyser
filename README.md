@@ -14,8 +14,9 @@ PDF statement  --(parser)-->  Transaction  --(repository)-->  SQLite
 
 - **`expense_analyser/models.py`** — `Transaction`, the canonical schema every statement format gets normalized into. Amounts are stored as integer cents (never float — see `LEARNINGS.md`) to avoid rounding errors.
 - **`expense_analyser/parsers/base.py`** — `StatementParser`, an abstract base class. Each bank/card/document-format gets its own subclass that knows how to turn its specific PDF layout into a list of `Transaction`s. Nothing else in the system needs to know how any individual format is laid out.
-- **`expense_analyser/parsers/registry.py`** — `PARSER_REGISTRY`, mapping a folder-path key (e.g. `"IslandFederal_checking/bank_statment"`) to the parser class that understands it. Adding a new source means writing one new parser class and one registry entry — no other code changes.
+- **`expense_analyser/parsers/registry.py`** — `PARSER_REGISTRY`, mapping a folder-path key (e.g. `"IslandFederal_checking/bank_statement"`) to the parser class that understands it. Adding a new source means writing one new parser class and one registry entry — no other code changes.
 - **`expense_analyser/storage.py`** — `TransactionRepository`, a thin wrapper around SQLite. Inserts are idempotent (`INSERT OR IGNORE` + a `UNIQUE` constraint on a content hash), so re-ingesting overlapping statements is safe.
+- **`expense_analyser/ingest.py`** — the ingestion CLI. Walks `expense_reports/`, looks up the right parser per folder via `PARSER_REGISTRY`, and stores the results. Folders with no matching registry entry are skipped with a warning rather than crashing the run.
 
 ### Folder convention for statements
 
@@ -23,9 +24,9 @@ PDF statement  --(parser)-->  Transaction  --(repository)-->  SQLite
 expense_reports/<account_id>/<document_type>/*.pdf
 ```
 
-e.g. `expense_reports/IslandFederal_checking/bank_statment/` and `expense_reports/IslandFederal_checking/transaction_history/` — one real bank account can have PDFs in more than one layout (e.g. an official mailed statement vs. a web transaction-history export), so `account_id` (which real account this money moved through) is kept separate from the parser routing key (which layout this specific file uses). All parsers for the same account still tag their output with the same `account_id`, so spending analysis groups correctly regardless of which document format a transaction came from.
+e.g. `expense_reports/IslandFederal_checking/bank_statement/` and `expense_reports/IslandFederal_checking/transaction_history/` — one real bank account can have PDFs in more than one layout (e.g. an official mailed statement vs. a web transaction-history export), so `account_id` (which real account this money moved through) is kept separate from the parser routing key (which layout this specific file uses). All parsers for the same account still tag their output with the same `account_id`, so spending analysis groups correctly regardless of which document format a transaction came from.
 
-`expense_reports/` is gitignored — real statement PDFs never get committed.
+`expense_reports/` is gitignored — real statement PDFs never get committed. The SQLite database file (`*.db`) is gitignored too, since it holds your real parsed transaction data.
 
 ## Status
 
@@ -34,7 +35,7 @@ e.g. `expense_reports/IslandFederal_checking/bank_statment/` and `expense_report
 - [x] SQLite storage layer with idempotent inserts
 - [x] `IslandFederalStatementParser` (official bank statement format)
 - [ ] Parser for IslandFederal checking transaction-history export format
-- [ ] Ingestion CLI
+- [x] Ingestion CLI
 - [ ] Categorization CLI (with merchant-rule auto-suggestion)
 - [ ] Spend analysis / reporting
 - [ ] Self-hostable packaging (Docker Compose) + web UI for phone access
@@ -46,4 +47,18 @@ python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 pytest
+```
+
+## Usage
+
+Ingest all statement PDFs under `expense_reports/` into the database:
+
+```
+python -m expense_analyser.ingest
+```
+
+By default this reads from `expense_reports/` and writes to `expenses.db` in the project root. Both are configurable:
+
+```
+python -m expense_analyser.ingest --expense-reports-dir path/to/statements --db-path path/to/expenses.db
 ```
