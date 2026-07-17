@@ -250,10 +250,13 @@ def review_month(repo: TransactionRepository, month: str) -> None:
     total = sum(txn.amount for txn in transactions)
     print(f"\n{month} total: {format_amount(total)}")
 
-    print(f"\nTransactions for {month}:")
-    for i, txn in enumerate(transactions, start=1):
-        category = txn.category or "Uncategorized"
-        print(f"  {i}. {txn.transaction_date} | {format_amount(txn.amount):>10} | {txn.description} | {category}")
+    def print_transactions() -> None:
+        print(f"\nTransactions for {month}:")
+        for i, txn in enumerate(transactions, start=1):
+            category = txn.category or "Uncategorized"
+            print(f"  {i}. {txn.transaction_date} | {format_amount(txn.amount):>10} | {txn.description} | {category}")
+
+    print_transactions()
 
     known_categories = _known_categories(repo)
 
@@ -285,6 +288,7 @@ def review_month(repo: TransactionRepository, month: str) -> None:
         repo.set_merchant_rule(normalize_description(txn.description), new_category)
         txn.category = new_category
         print(f"Updated to {new_category!r}.")
+        print_transactions()
 
 
 def main() -> None:

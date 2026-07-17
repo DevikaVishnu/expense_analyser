@@ -324,6 +324,23 @@ def test_review_month_changes_category_by_number():
     assert repo.get_merchant_rule("UBER *TRIP") == "Eat Out"
 
 
+def test_review_month_reprints_list_with_updated_category(capsys):
+    repo = TransactionRepository(":memory:")
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 5), description="UBER *TRIP", amount=-500, category="Uber"))
+
+    eat_out_number = str(CATEGORIES.index("Eat Out") + 1)
+    responses = iter(["1", eat_out_number, ""])
+    with patch("builtins.input", lambda prompt="": next(responses)):
+        review_month(repo, "2026-01")
+
+    out = capsys.readouterr().out
+    # The transaction list should be printed twice — once initially
+    # showing "Uber", once again after the change showing "Eat Out".
+    assert out.count("Transactions for 2026-01:") == 2
+    assert "| Uber" in out
+    assert "| Eat Out" in out
+
+
 def test_review_month_invalid_transaction_number_does_not_crash():
     repo = TransactionRepository(":memory:")
     repo.insert(_make_transaction(transaction_date=date(2026, 1, 5), amount=-500, category="Uber"))
