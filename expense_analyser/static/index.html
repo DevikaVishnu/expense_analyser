@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Expense Analyser</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="page">
+    <h1>Expense Analyser</h1>
+    <p class="subtitle">Click a month to see its category breakdown and transactions.</p>
+
+    <div class="card">
+      <h2>Expenditure by month</h2>
+      <div id="month-chart"></div>
+    </div>
+
+    <div class="card">
+      <h2 id="hero-month"></h2>
+      <p class="hero" id="hero-value"></p>
+      <p class="hero-extra" id="hero-extra"></p>
+    </div>
+
+    <div class="card">
+      <h2>Spend by category</h2>
+      <div id="category-chart"></div>
+    </div>
+
+    <div class="card">
+      <h2>Transactions</h2>
+      <div id="transaction-table"></div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

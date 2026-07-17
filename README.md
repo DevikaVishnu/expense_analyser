@@ -20,7 +20,7 @@ PDF statement  --(parser)-->  Transaction  --(repository)-->  SQLite
 - **`expense_analyser/categorization.py`** — the categorization CLI. Genuine deposits and known merchants are auto-labeled without prompting (a merchant rule, once set, applies itself to every future transaction from that merchant — including refunds, which share the original purchase's description); only genuinely new merchants stop and ask. `recategorize()` bulk-fixes an already-categorized merchant by search term; `review_month()`/`review_category()` show a given month's or category's total and every transaction in it, letting you selectively fix any of their categories — `review_category` is the tool for "this category's report total looks wrong, what's actually in it?", since a merchant-key collision (two different real-world merchants sharing the same normalized key) can silently lump an unrelated transaction into the wrong category.
 - **`expense_analyser/reporting.py`** — spend-by-category, spend-by-month, and spend-by-month-and-category reports, printed to the terminal and exported to `reports/` as CSV. Amounts are summed net of refunds within each category/month. The monthly total is *expenditure*, not net cash flow: `Income` and any categories listed in `SEPARATE_CATEGORIES` (large, irregular payments like tuition) are excluded from the headline number, though they still appear as their own line in the category breakdown.
 - **`expense_analyser/formatting.py`** — `format_amount`, the shared "signed integer cents -> human-readable dollar string" helper used by both `categorization.py` and `reporting.py`.
-- **`expense_analyser/api.py`** — FastAPI backend for a future web UI. `GET /api/months` (expenditure + separate-category totals per month), `GET /api/months/{month}/transactions`, and `PATCH /api/transactions/{transaction_id}` (updates category + merchant rule, same as the CLI). Amounts are returned as raw integer cents, not dollars — formatting is a display concern for whatever consumes the API.
+- **`expense_analyser/api.py`** + **`expense_analyser/static/`** — FastAPI backend and web frontend. `GET /api/months` (expenditure + separate-category totals per month), `GET /api/months/{month}/categories`, `GET /api/months/{month}/transactions`, and `PATCH /api/transactions/{transaction_id}` (updates category + merchant rule, same as the CLI, built but not yet wired into the UI — view-only for this first pass). Amounts are returned as raw integer cents, not dollars — formatting is a display concern for whatever consumes the API. The frontend (`static/index.html`/`app.js`/`style.css`) is vanilla JS with hand-rolled SVG bar charts (no charting library) — a monthly expenditure trend, a per-month category breakdown, and a transaction table, wired together by clicking a month.
 
 ### Folder convention for statements
 
@@ -42,8 +42,9 @@ e.g. `expense_reports/IslandFederal_checking/bank_statement/` and `expense_repor
 - [x] Ingestion CLI
 - [x] Categorization CLI (with merchant-rule auto-suggestion)
 - [x] Spend analysis / reporting
-- [x] FastAPI backend (months, transactions-by-month, category updates)
-- [ ] Web frontend
+- [x] FastAPI backend (months, categories-by-month, transactions-by-month, category updates)
+- [x] Web frontend (view-only: monthly trend, category breakdown, transaction table)
+- [ ] Category editing wired into the frontend (backend endpoint exists, UI doesn't call it yet)
 - [ ] Self-hostable packaging (Docker Compose) + phone access
 
 ## Setup
@@ -99,10 +100,12 @@ Generate reports:
 python3 -m expense_analyser.reporting
 ```
 
-Or run the API backend (no frontend yet — hit the endpoints directly, or via the interactive docs at `/docs`):
+Or run the web UI:
 
 ```
 uvicorn expense_analyser.api:app --reload
 ```
+
+Then open `http://127.0.0.1:8000/` for the dashboard, or `/docs` for the API's interactive documentation.
 
 Prints spend-by-category, spend-by-month, and a spend-by-month-and-category breakdown to the terminal, and writes matching CSVs to `reports/` (both `--db-path` and `--reports-dir` are overridable, same pattern as above).

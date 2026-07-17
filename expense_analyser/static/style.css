@@ -1,0 +1,184 @@
+:root {
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+  --gridline: #e1e0d9;
+  --baseline: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.1);
+  --accent: #2a78d6;
+  --accent-hover: #1c5cab;
+  --good: #006300;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --gridline: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255, 255, 255, 0.1);
+    --accent: #3987e5;
+    --accent-hover: #86b6ef;
+    --good: #0ca30c;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--page);
+  color: var(--text-primary);
+}
+
+.page {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+}
+
+h1 {
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.subtitle {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin: 0 0 32px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+}
+
+.card h2 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 16px;
+  color: var(--text-primary);
+}
+
+.chart-svg text {
+  fill: var(--text-muted);
+  font-size: 11px;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.chart-svg .value-label {
+  fill: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.chart-svg .axis-label {
+  fill: var(--text-secondary);
+  font-size: 12px;
+}
+
+.chart-svg .gridline {
+  stroke: var(--gridline);
+  stroke-width: 1;
+}
+
+.chart-svg .baseline {
+  stroke: var(--baseline);
+  stroke-width: 1;
+}
+
+.chart-svg .bar {
+  fill: var(--accent);
+  cursor: pointer;
+  transition: fill 0.1s ease;
+}
+
+.chart-svg .bar:hover,
+.chart-svg .bar.selected {
+  fill: var(--accent-hover);
+}
+
+.tooltip {
+  position: fixed;
+  pointer-events: none;
+  background: var(--text-primary);
+  color: var(--surface);
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+  white-space: nowrap;
+}
+
+.tooltip.visible {
+  opacity: 1;
+}
+
+.tooltip .tt-value {
+  font-weight: 600;
+}
+
+.tooltip .tt-label {
+  color: var(--text-muted);
+}
+
+.hero {
+  font-size: 32px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.hero-extra {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+th {
+  text-align: left;
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 12px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--gridline);
+}
+
+td {
+  padding: 8px;
+  border-bottom: 1px solid var(--gridline);
+  font-variant-numeric: tabular-nums;
+}
+
+td.amount {
+  text-align: right;
+}
+
+td.desc {
+  font-variant-numeric: normal;
+}
+
+.empty-state {
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 12px 0;
+}

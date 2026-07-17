@@ -46,6 +46,27 @@ def test_list_months_returns_expenditure_and_separate_totals():
     ]
 
 
+def test_list_month_categories_returns_breakdown_for_that_month():
+    repo = TransactionRepository(":memory:")
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 5), amount=-500, category="Groceries"))
+    repo.insert(_make_transaction(transaction_date=date(2026, 2, 5), amount=-300, category="Eat Out"))
+
+    response = _client_with_repo(repo).get("/api/months/2026-01/categories")
+
+    assert response.status_code == 200
+    assert response.json() == [{"category": "Groceries", "total": -500}]
+
+
+def test_list_month_categories_labels_null_category_as_uncategorized():
+    repo = TransactionRepository(":memory:")
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 5), amount=-500, category=None))
+
+    response = _client_with_repo(repo).get("/api/months/2026-01/categories")
+
+    assert response.status_code == 200
+    assert response.json() == [{"category": "Uncategorized", "total": -500}]
+
+
 def test_list_month_transactions_returns_only_that_months_transactions():
     repo = TransactionRepository(":memory:")
     repo.insert(_make_transaction(transaction_date=date(2026, 1, 5), description="UBER *TRIP"))

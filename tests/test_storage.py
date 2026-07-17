@@ -179,3 +179,14 @@ def test_spend_by_month_and_category_groups_by_both():
     assert results[("2026-01", "Groceries")] == -500
     assert results[("2026-01", "Eat Out")] == -300
     assert results[("2026-02", "Groceries")] == -100
+
+
+def test_spend_by_category_for_month_filters_to_that_month_only():
+    repo = TransactionRepository(":memory:")
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 15), amount=-500, category="Groceries"))
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 20), amount=-300, category="Eat Out"))
+    repo.insert(_make_transaction(transaction_date=date(2026, 2, 1), amount=-100, category="Groceries"))
+
+    results = dict(repo.spend_by_category_for_month("2026-01"))
+
+    assert results == {"Groceries": -500, "Eat Out": -300}

@@ -148,6 +148,19 @@ class TransactionRepository:
         )
         return cursor.fetchall()
 
+    def spend_by_category_for_month(self, month: str) -> list[tuple[str | None, int]]:
+        cursor = self.connection.execute(
+            """
+            SELECT category, SUM(amount)
+            FROM transactions
+            WHERE strftime('%Y-%m', transaction_date) = ?
+            GROUP BY category
+            ORDER BY SUM(amount) ASC
+            """,
+            (month,),
+        )
+        return cursor.fetchall()
+
     def get_merchant_rule(self, normalized_description: str) -> str | None:
         cursor = self.connection.execute(
             "SELECT category FROM merchant_rules WHERE normalized_description = ?",
