@@ -33,11 +33,30 @@ CATEGORIES = [
     "Eat Out",
     "Groceries",
     "Uber",
-    "Train",
     "Online purchases",
     "Medicines",
     "Miscellaneous",
 ]
+
+# Categories that get combined into one rollup row wherever spend is
+# broken out by category — a display concept only. Transactions keep
+# their real, granular category (e.g. "Subway") for tracking; reports
+# additionally show the group's combined total under the group name.
+# "Train" was removed from CATEGORIES above once it became a group
+# name, so it can't also be picked as a literal category and collide
+# with the rollup.
+CATEGORY_GROUPS = {
+    "Train": ["Subway", "Amtrak", "LIRR"],
+}
+
+
+def _group_for_category(category: str) -> str:
+    """The display name for category — its group's name if it belongs
+    to one, otherwise the category itself unchanged."""
+    for group, members in CATEGORY_GROUPS.items():
+        if category in members:
+            return group
+    return category
 
 # Categories excluded from "total expenditure" figures even though some
 # represent real spending (Stony Brook does) — large, infrequent payments

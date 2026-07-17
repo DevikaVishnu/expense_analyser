@@ -9,7 +9,7 @@ import argparse
 import csv
 from pathlib import Path
 
-from expense_analyser.categorization import INCOME_CATEGORY, SEPARATE_CATEGORIES
+from expense_analyser.categorization import INCOME_CATEGORY, SEPARATE_CATEGORIES, _group_for_category
 from expense_analyser.formatting import format_amount
 from expense_analyser.storage import TransactionRepository
 
@@ -51,9 +51,24 @@ def _format_separate_totals(separate_for_month: dict[str, int] | None) -> str:
     return f"  ({parts})"
 
 
+def _apply_category_groups(rows: list[tuple[str | None, int]]) -> list[tuple[str | None, int]]:
+    """Collapses rows whose category belongs to a CATEGORY_GROUPS group
+    (see categorization.py) into one combined row under the group's
+    name — e.g. Subway + Amtrak + LIRR become one "Train" row, summed.
+    Transactions keep their real, granular category in storage; this
+    only affects how category breakdowns are displayed. Uncategorized
+    (None) and ungrouped categories pass through unchanged.
+    """
+    grouped: dict[str | None, int] = {}
+    for category, total in rows:
+        display_category = _group_for_category(category) if category is not None else category
+        grouped[display_category] = grouped.get(display_category, 0) + total
+    return sorted(grouped.items(), key=lambda item: item[1])
+
+
 def print_spend_by_category(repo: TransactionRepository) -> None:
     print("\nSpend by category:")
-    for category, total in repo.spend_by_category():
+    for category, total in _apply_category_groups(repo.spend_by_category()):
         label = category or "Uncategorized"
         print(f"  {label:<25} {format_amount(total):>12}")
 
@@ -69,18 +84,17 @@ def print_spend_by_month(repo: TransactionRepository) -> None:
 def print_spend_by_month_and_category(repo: TransactionRepository) -> None:
     expenditure, separate = _monthly_breakdown(repo)
 
-    print("\nSpend by month and category:")
-    current_month = None
-    # Rows arrive pre-sorted by month (spend_by_month_and_category's SQL
-    # does GROUP BY month, category ORDER BY month, ...), so a month
-    # header only needs printing when the month actually changes.
+    rows_by_month: dict[str, list[tuple[str | None, int]]] = {}
     for month, category, total in repo.spend_by_month_and_category():
-        if month != current_month:
-            extra = _format_separate_totals(separate.get(month))
-            print(f"\n  {month} (expenditure: {format_amount(expenditure[month])}{extra}):")
-            current_month = month
-        label = category or "Uncategorized"
-        print(f"    {label:<25} {format_amount(total):>12}")
+        rows_by_month.setdefault(month, []).append((category, total))
+
+    print("\nSpend by month and category:")
+    for month in sorted(rows_by_month):
+        extra = _format_separate_totals(separate.get(month))
+        print(f"\n  {month} (expenditure: {format_amount(expenditure[month])}{extra}):")
+        for category, total in _apply_category_groups(rows_by_month[month]):
+            label = category or "Uncategorized"
+            print(f"    {label:<25} {format_amount(total):>12}")
 
 
 def write_csv(rows: list[tuple], headers: list[str], path: Path) -> None:
@@ -104,6 +118,18 @@ def write_month_category_csv(rows: list[tuple], path: Path) -> None:
             writer.writerow([month, category or "Uncategorized", f"{total_cents / 100:.2f}"])
 
 
+def _grouped_month_category_rows(repo: TransactionRepository) -> list[tuple[str, str | None, int]]:
+    rows_by_month: dict[str, list[tuple[str | None, int]]] = {}
+    for month, category, total in repo.spend_by_month_and_category():
+        rows_by_month.setdefault(month, []).append((category, total))
+
+    return [
+        (month, category, total)
+        for month in sorted(rows_by_month)
+        for category, total in _apply_category_groups(rows_by_month[month])
+    ]
+
+
 def generate_reports(repo: TransactionRepository, reports_dir: Path) -> None:
     print_spend_by_category(repo)
     print_spend_by_month(repo)
@@ -111,9 +137,9 @@ def generate_reports(repo: TransactionRepository, reports_dir: Path) -> None:
 
     expenditure, _ = _monthly_breakdown(repo)
 
-    write_csv(repo.spend_by_category(), ["category", "total"], reports_dir / "spend_by_category.csv")
+    write_csv(_apply_category_groups(repo.spend_by_category()), ["category", "total"], reports_dir / "spend_by_category.csv")
     write_csv(sorted(expenditure.items()), ["month", "total"], reports_dir / "spend_by_month.csv")
-    write_month_category_csv(repo.spend_by_month_and_category(), reports_dir / "spend_by_month_and_category.csv")
+    write_month_category_csv(_grouped_month_category_rows(repo), reports_dir / "spend_by_month_and_category.csv")
 
     print(f"\nCSV reports written to {reports_dir}/")
 

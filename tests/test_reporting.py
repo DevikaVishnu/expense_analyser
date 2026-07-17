@@ -3,6 +3,7 @@ from datetime import date
 from expense_analyser.categorization import INCOME_CATEGORY
 from expense_analyser.models import Transaction
 from expense_analyser.reporting import (
+    _apply_category_groups,
     _monthly_breakdown,
     generate_reports,
     print_spend_by_category,
@@ -47,6 +48,41 @@ def test_print_spend_by_category_shows_real_category(capsys):
     out = capsys.readouterr().out
     assert "Groceries" in out
     assert "-$5.00" in out
+
+
+# --- category groups ---
+
+
+def test_apply_category_groups_combines_members_into_group_total():
+    rows = [("Subway", -500), ("Amtrak", -300), ("LIRR", -200), ("Groceries", -100)]
+
+    grouped = _apply_category_groups(rows)
+
+    assert dict(grouped) == {"Train": -1000, "Groceries": -100}
+
+
+def test_apply_category_groups_leaves_ungrouped_and_uncategorized_alone():
+    rows = [("Groceries", -500), (None, -300)]
+
+    grouped = _apply_category_groups(rows)
+
+    assert dict(grouped) == {"Groceries": -500, None: -300}
+
+
+def test_print_spend_by_category_shows_train_rollup(capsys):
+    repo = TransactionRepository(":memory:")
+    repo.insert(_make_transaction(amount=-500, category="Subway"))
+    repo.insert(_make_transaction(amount=-300, category="Amtrak"))
+    repo.insert(_make_transaction(amount=-200, category="LIRR"))
+
+    print_spend_by_category(repo)
+
+    out = capsys.readouterr().out
+    assert "Train" in out
+    assert "-$10.00" in out
+    assert "Subway" not in out
+    assert "Amtrak" not in out
+    assert "LIRR" not in out
 
 
 def test_print_spend_by_month_groups_by_month(capsys):
@@ -154,6 +190,20 @@ def test_print_spend_by_month_and_category_separates_multiple_months(capsys):
     out = capsys.readouterr().out
     assert out.count("2026-01 (expenditure:") == 1
     assert out.count("2026-02 (expenditure:") == 1
+
+
+def test_print_spend_by_month_and_category_shows_train_rollup(capsys):
+    repo = TransactionRepository(":memory:")
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 5), amount=-500, category="Subway"))
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 10), amount=-300, category="Amtrak"))
+
+    print_spend_by_month_and_category(repo)
+
+    out = capsys.readouterr().out
+    assert "Train" in out
+    assert "-$8.00" in out
+    assert "Subway" not in out
+    assert "Amtrak" not in out
 
 
 def test_write_csv_creates_directory_and_file(tmp_path):

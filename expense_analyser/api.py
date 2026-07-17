@@ -22,7 +22,7 @@ from pydantic import BaseModel
 
 from expense_analyser.categorization import normalize_description
 from expense_analyser.models import Transaction
-from expense_analyser.reporting import _monthly_breakdown
+from expense_analyser.reporting import _apply_category_groups, _monthly_breakdown
 from expense_analyser.storage import TransactionRepository
 
 DB_PATH = "expenses.db"
@@ -65,7 +65,7 @@ def list_month_categories(
 ) -> list[CategoryTotal]:
     return [
         CategoryTotal(category=category or "Uncategorized", total=total)
-        for category, total in repo.spend_by_category_for_month(month)
+        for category, total in _apply_category_groups(repo.spend_by_category_for_month(month))
     ]
 
 

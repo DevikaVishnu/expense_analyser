@@ -67,6 +67,17 @@ def test_list_month_categories_labels_null_category_as_uncategorized():
     assert response.json() == [{"category": "Uncategorized", "total": -500}]
 
 
+def test_list_month_categories_rolls_up_train_group():
+    repo = TransactionRepository(":memory:")
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 5), amount=-500, category="Subway"))
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 10), amount=-300, category="Amtrak"))
+
+    response = _client_with_repo(repo).get("/api/months/2026-01/categories")
+
+    assert response.status_code == 200
+    assert response.json() == [{"category": "Train", "total": -800}]
+
+
 def test_list_month_transactions_returns_only_that_months_transactions():
     repo = TransactionRepository(":memory:")
     repo.insert(_make_transaction(transaction_date=date(2026, 1, 5), description="UBER *TRIP"))

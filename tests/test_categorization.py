@@ -4,6 +4,7 @@ from unittest.mock import patch
 from expense_analyser.categorization import (
     CATEGORIES,
     INCOME_CATEGORY,
+    _group_for_category,
     _known_categories,
     _resolve_category,
     categorize_interactively,
@@ -103,6 +104,23 @@ def test_known_categories_deduplicates_case_insensitively():
 
     known = _known_categories(repo)
     assert known.count("shopping") + known.count("Shopping") == 1
+
+
+# --- category groups ---
+
+
+def test_group_for_category_returns_group_name_for_a_member():
+    assert _group_for_category("Subway") == "Train"
+    assert _group_for_category("Amtrak") == "Train"
+    assert _group_for_category("LIRR") == "Train"
+
+
+def test_group_for_category_returns_unchanged_for_ungrouped_category():
+    assert _group_for_category("Groceries") == "Groceries"
+
+
+def test_train_is_not_in_categories_since_it_became_a_group_name():
+    assert "Train" not in CATEGORIES
 
 
 # --- categorize_interactively ---
