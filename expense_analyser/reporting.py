@@ -9,11 +9,36 @@ import argparse
 import csv
 from pathlib import Path
 
+from expense_analyser.categorization import INCOME_CATEGORY
 from expense_analyser.formatting import format_amount
 from expense_analyser.storage import TransactionRepository
 
 DEFAULT_DB_PATH = "expenses.db"
 DEFAULT_REPORTS_DIR = "reports"
+
+# Categories excluded from the "total expenditure" figure even though
+# some represent real spending (Stony Brook does) — large, infrequent
+# payments that would distort what a normal month's spending looks
+# like if netted into the same total as day-to-day expenses. Still
+# shown as their own line in the category breakdown, just not folded
+# into the headline number. Extend as needed.
+SEPARATE_CATEGORIES = ["Stony Brook"]
+
+
+def _monthly_expenditure(repo: TransactionRepository) -> dict[str, int]:
+    """Total spend per month, counting only actual routine expenses —
+    excludes INCOME_CATEGORY (not spending at all, so netting it in
+    would understate how much actually went out) and
+    SEPARATE_CATEGORIES (real spending, but tracked apart from
+    routine expenditure since it's large and irregular).
+    """
+    excluded = {INCOME_CATEGORY, *SEPARATE_CATEGORIES}
+    totals: dict[str, int] = {}
+    for month, category, total in repo.spend_by_month_and_category():
+        if category in excluded:
+            continue
+        totals[month] = totals.get(month, 0) + total
+    return totals
 
 
 def print_spend_by_category(repo: TransactionRepository) -> None:
@@ -24,13 +49,13 @@ def print_spend_by_category(repo: TransactionRepository) -> None:
 
 
 def print_spend_by_month(repo: TransactionRepository) -> None:
-    print("\nSpend by month:")
-    for month, total in repo.spend_by_month():
+    print("\nTotal expenditure by month:")
+    for month, total in sorted(_monthly_expenditure(repo).items()):
         print(f"  {month:<25} {format_amount(total):>12}")
 
 
 def print_spend_by_month_and_category(repo: TransactionRepository) -> None:
-    monthly_totals = dict(repo.spend_by_month())
+    monthly_totals = _monthly_expenditure(repo)
 
     print("\nSpend by month and category:")
     current_month = None
@@ -39,7 +64,7 @@ def print_spend_by_month_and_category(repo: TransactionRepository) -> None:
     # header only needs printing when the month actually changes.
     for month, category, total in repo.spend_by_month_and_category():
         if month != current_month:
-            print(f"\n  {month} (total: {format_amount(monthly_totals[month])}):")
+            print(f"\n  {month} (expenditure: {format_amount(monthly_totals[month])}):")
             current_month = month
         label = category or "Uncategorized"
         print(f"    {label:<25} {format_amount(total):>12}")
@@ -72,7 +97,7 @@ def generate_reports(repo: TransactionRepository, reports_dir: Path) -> None:
     print_spend_by_month_and_category(repo)
 
     write_csv(repo.spend_by_category(), ["category", "total"], reports_dir / "spend_by_category.csv")
-    write_csv(repo.spend_by_month(), ["month", "total"], reports_dir / "spend_by_month.csv")
+    write_csv(sorted(_monthly_expenditure(repo).items()), ["month", "total"], reports_dir / "spend_by_month.csv")
     write_month_category_csv(repo.spend_by_month_and_category(), reports_dir / "spend_by_month_and_category.csv")
 
     print(f"\nCSV reports written to {reports_dir}/")
