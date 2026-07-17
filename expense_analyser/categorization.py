@@ -235,28 +235,39 @@ def recategorize(repo: TransactionRepository, search_term: str) -> None:
     print(f"\nUpdated {len(matches)} transaction(s) to {new_category!r}.")
 
 
-def review_month(repo: TransactionRepository, month: str) -> None:
-    """Show the total spend and every individual transaction for month
-    (format "YYYY-MM"), then let the user selectively change the
-    category of any of them by number — as many times as needed, not
-    a forced one-by-one pass through every transaction.
-    """
-    transactions = repo.fetch_by_month(month)
+def _review_transactions(
+    repo: TransactionRepository,
+    transactions: list[Transaction],
+    label: str,
+    category_filter: str | None = None,
+) -> None:
+    """Show a running total + numbered list for transactions, then let
+    the user selectively change any of their categories by number —
+    as many times as needed, not a forced one-by-one pass through
+    every transaction. Shared by review_month and review_category,
+    which differ only in how transactions was sliced.
 
+    category_filter, when set, means this list is "everything
+    currently in category X" (review_category's case) — if a change
+    moves a transaction to a *different* category, it no longer
+    belongs here, so it's dropped from the list and the total is
+    recomputed, rather than just having its label updated in place
+    (which is what happens for review_month, where category_filter is
+    None since the transaction's month never changes).
+    """
     if not transactions:
-        print(f"No transactions found for {month}.")
+        print(f"No transactions found for {label}.")
         return
 
-    total = sum(txn.amount for txn in transactions)
-    print(f"\n{month} total: {format_amount(total)}")
-
-    def print_transactions() -> None:
-        print(f"\nTransactions for {month}:")
+    def print_state() -> None:
+        total = sum(txn.amount for txn in transactions)
+        print(f"\n{label} total: {format_amount(total)}")
+        print(f"Transactions for {label}:")
         for i, txn in enumerate(transactions, start=1):
             category = txn.category or "Uncategorized"
             print(f"  {i}. {txn.transaction_date} | {format_amount(txn.amount):>10} | {txn.description} | {category}")
 
-    print_transactions()
+    print_state()
 
     known_categories = _known_categories(repo)
 
@@ -286,9 +297,38 @@ def review_month(repo: TransactionRepository, month: str) -> None:
 
         repo.update_category(txn.id, new_category)
         repo.set_merchant_rule(normalize_description(txn.description), new_category)
-        txn.category = new_category
-        print(f"Updated to {new_category!r}.")
-        print_transactions()
+
+        if category_filter is not None and new_category.lower() != category_filter.lower():
+            transactions.remove(txn)
+            print(f"Moved to {new_category!r} — removed from this list.")
+        else:
+            txn.category = new_category
+            print(f"Updated to {new_category!r}.")
+
+        if not transactions:
+            print(f"\nNo transactions left for {label}.")
+            break
+
+        print_state()
+
+
+def review_month(repo: TransactionRepository, month: str) -> None:
+    """Show the total spend and every individual transaction for month
+    (format "YYYY-MM"), then let the user selectively fix any of their
+    categories.
+    """
+    _review_transactions(repo, repo.fetch_by_month(month), label=month)
+
+
+def review_category(repo: TransactionRepository, category: str) -> None:
+    """Show every transaction currently assigned to category, along
+    with its running total, and let the user move any outliers to a
+    different category — the tool for "this category's total looks
+    wrong in the report, what's actually in it?" A transaction moved
+    elsewhere is removed from this list, so the total shown always
+    reflects what's left still assigned to category.
+    """
+    _review_transactions(repo, repo.fetch_by_category(category), label=category, category_filter=category)
 
 
 def main() -> None:
@@ -308,12 +348,22 @@ def main() -> None:
         ),
     )
     arg_parser.add_argument(
-        "--review",
+        "--review-month",
         metavar="MONTH",
         help=(
             "Show the total spend and every transaction for MONTH (YYYY-MM), "
             "and optionally change any of their categories, instead of the "
             "normal uncategorized-only flow."
+        ),
+    )
+    arg_parser.add_argument(
+        "--review-category",
+        metavar="CATEGORY",
+        help=(
+            "Show every transaction currently in CATEGORY and its running "
+            "total, and optionally move any outliers to a different "
+            "category — for tracking down why a category's report total "
+            "looks wrong."
         ),
     )
     args = arg_parser.parse_args()
@@ -322,8 +372,10 @@ def main() -> None:
 
     if args.recategorize:
         recategorize(repo, args.recategorize)
-    elif args.review:
-        review_month(repo, args.review)
+    elif args.review_month:
+        review_month(repo, args.review_month)
+    elif args.review_category:
+        review_category(repo, args.review_category)
     else:
         categorize_interactively(repo)
 

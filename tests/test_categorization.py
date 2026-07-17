@@ -9,6 +9,7 @@ from expense_analyser.categorization import (
     categorize_interactively,
     normalize_description,
     recategorize,
+    review_category,
     review_month,
 )
 from expense_analyser.models import Transaction
@@ -360,3 +361,61 @@ def test_review_month_blank_response_finishes_without_changes():
         review_month(repo, "2026-01")
 
     assert repo.fetch_all()[0].category == "Uber"
+
+
+# --- review_category ---
+
+
+def test_review_category_no_transactions(capsys):
+    repo = TransactionRepository(":memory:")
+
+    review_category(repo, "Bank of America Expenses")
+
+    assert "No transactions found for Bank of America Expenses" in capsys.readouterr().out
+
+
+def test_review_category_shows_total_and_list(capsys):
+    repo = TransactionRepository(":memory:")
+    repo.insert(_make_transaction(description="EFT A", amount=-300, category="Bank of America Expenses"))
+    repo.insert(_make_transaction(description="EFT B", amount=-11900, category="Bank of America Expenses"))
+
+    with patch("builtins.input", lambda prompt="": ""):
+        review_category(repo, "Bank of America Expenses")
+
+    out = capsys.readouterr().out
+    assert "Bank of America Expenses total: -$122.00" in out
+    assert "EFT A" in out
+    assert "EFT B" in out
+
+
+def test_review_category_moving_outlier_removes_it_from_list_and_updates_total():
+    repo = TransactionRepository(":memory:")
+    repo.insert(_make_transaction(
+        transaction_date=date(2025, 1, 1), description="EFT CKTRANSFER", amount=-300, category="Bank of America Expenses"
+    ))
+    repo.insert(_make_transaction(
+        transaction_date=date(2025, 1, 2), description="EFT SBUFEESDEPOSIT", amount=-1190000, category="Bank of America Expenses"
+    ))
+
+    misc_number = str(CATEGORIES.index("Miscellaneous") + 1)
+    # fetch_by_category orders by transaction_date, so transaction 2 is
+    # the later-dated outlier — move it to Miscellaneous, then finish.
+    responses = iter(["2", misc_number, ""])
+    with patch("builtins.input", lambda prompt="": next(responses)):
+        review_category(repo, "Bank of America Expenses")
+
+    remaining = repo.fetch_by_category("Bank of America Expenses")
+    assert len(remaining) == 1
+    assert remaining[0].description == "EFT CKTRANSFER"
+    assert repo.fetch_by_category("Miscellaneous")[0].description == "EFT SBUFEESDEPOSIT"
+
+
+def test_review_category_reselecting_same_category_keeps_it_in_list():
+    repo = TransactionRepository(":memory:")
+    repo.insert(_make_transaction(description="EFT CKTRANSFER", amount=-300, category="Bank of America Expenses"))
+
+    responses = iter(["1", "Bank of America Expenses", ""])
+    with patch("builtins.input", lambda prompt="": next(responses)):
+        review_category(repo, "Bank of America Expenses")
+
+    assert len(repo.fetch_by_category("Bank of America Expenses")) == 1

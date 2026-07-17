@@ -30,6 +30,8 @@ def print_spend_by_month(repo: TransactionRepository) -> None:
 
 
 def print_spend_by_month_and_category(repo: TransactionRepository) -> None:
+    monthly_totals = dict(repo.spend_by_month())
+
     print("\nSpend by month and category:")
     current_month = None
     # Rows arrive pre-sorted by month (spend_by_month_and_category's SQL
@@ -37,7 +39,7 @@ def print_spend_by_month_and_category(repo: TransactionRepository) -> None:
     # header only needs printing when the month actually changes.
     for month, category, total in repo.spend_by_month_and_category():
         if month != current_month:
-            print(f"\n  {month}:")
+            print(f"\n  {month} (total: {format_amount(monthly_totals[month])}):")
             current_month = month
         label = category or "Uncategorized"
         print(f"    {label:<25} {format_amount(total):>12}")

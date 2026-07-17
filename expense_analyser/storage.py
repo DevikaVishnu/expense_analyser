@@ -81,6 +81,17 @@ class TransactionRepository:
             (month,),
         )
 
+    def fetch_by_category(self, category: str) -> list[Transaction]:
+        # COLLATE NOCASE: category values are already casing-normalized
+        # on write (see categorization._resolve_category), but this
+        # keeps a lookup like "bank of america" from missing rows
+        # stored as "Bank of America" just because the CLI arg's case
+        # doesn't match exactly.
+        return self._fetch(
+            "SELECT * FROM transactions WHERE category = ? COLLATE NOCASE ORDER BY transaction_date",
+            (category,),
+        )
+
     def get_all_categories(self) -> list[str]:
         cursor = self.connection.execute(
             "SELECT DISTINCT category FROM transactions WHERE category IS NOT NULL ORDER BY category"

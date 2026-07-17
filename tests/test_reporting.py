@@ -67,9 +67,20 @@ def test_print_spend_by_month_and_category_prints_month_header_once_per_month(ca
     print_spend_by_month_and_category(repo)
 
     out = capsys.readouterr().out
-    assert out.count("2026-01:") == 1
+    assert out.count("2026-01 (total:") == 1
     assert "Groceries" in out
     assert "Eat Out" in out
+
+
+def test_print_spend_by_month_and_category_shows_month_total(capsys):
+    repo = TransactionRepository(":memory:")
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 5), amount=-500, category="Groceries"))
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 10), amount=-300, category="Eat Out"))
+
+    print_spend_by_month_and_category(repo)
+
+    out = capsys.readouterr().out
+    assert "2026-01 (total: -$8.00):" in out
 
 
 def test_print_spend_by_month_and_category_separates_multiple_months(capsys):
@@ -80,8 +91,8 @@ def test_print_spend_by_month_and_category_separates_multiple_months(capsys):
     print_spend_by_month_and_category(repo)
 
     out = capsys.readouterr().out
-    assert out.count("2026-01:") == 1
-    assert out.count("2026-02:") == 1
+    assert out.count("2026-01 (total:") == 1
+    assert out.count("2026-02 (total:") == 1
 
 
 def test_write_csv_creates_directory_and_file(tmp_path):

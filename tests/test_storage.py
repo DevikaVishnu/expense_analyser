@@ -123,6 +123,17 @@ def test_fetch_by_month_filters_by_year_month():
     assert {t.amount for t in january} == {-100, -200}
 
 
+def test_fetch_by_category_filters_case_insensitively():
+    repo = TransactionRepository(":memory:")
+    repo.insert(_make_transaction(amount=-100, category="Groceries"))
+    repo.insert(_make_transaction(amount=-200, category="Uber"))
+
+    results = repo.fetch_by_category("groceries")
+
+    assert len(results) == 1
+    assert results[0].amount == -100
+
+
 def test_get_all_categories_returns_distinct_used_categories():
     repo = TransactionRepository(":memory:")
     repo.insert(_make_transaction(amount=-100, category="Groceries"))
