@@ -452,3 +452,50 @@ def test_review_category_reselecting_same_category_keeps_it_in_list():
         review_category(repo, "Bank of America Expenses")
 
     assert len(repo.fetch_by_category("Bank of America Expenses")) == 1
+
+
+def test_review_category_with_group_name_shows_combined_members(capsys):
+    repo = TransactionRepository(":memory:")
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 5), description="MTA*NYCT", amount=-300, category="Subway"))
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 10), description="AMTRAK.COM", amount=-10000, category="Amtrak"))
+
+    with patch("builtins.input", lambda prompt="": ""):
+        review_category(repo, "Train")
+
+    out = capsys.readouterr().out
+    assert "Train total: -$103.00" in out
+    assert "MTA*NYCT" in out
+    assert "AMTRAK.COM" in out
+
+
+def test_review_category_group_moving_within_group_stays_in_list(capsys):
+    # Both the message printed and the fact a second iteration of the
+    # loop happens (rather than the function returning) distinguish
+    # "stayed in list" from "removed" — the final category alone would
+    # be the same either way.
+    repo = TransactionRepository(":memory:")
+    repo.insert(_make_transaction(description="MTA*NYCT", amount=-300, category="Subway"))
+
+    responses = iter(["1", "Amtrak", ""])
+    with patch("builtins.input", lambda prompt="": next(responses)):
+        review_category(repo, "Train")
+
+    out = capsys.readouterr().out
+    assert "Updated to 'Amtrak'." in out
+    assert "removed from this list" not in out
+    assert repo.fetch_all()[0].category == "Amtrak"
+
+
+def test_review_category_group_moving_out_of_group_removes_from_list(capsys):
+    repo = TransactionRepository(":memory:")
+    repo.insert(_make_transaction(description="MTA*NYCT", amount=-300, category="Subway"))
+
+    # No trailing "" needed: removing the only transaction empties the
+    # list, which the loop detects and breaks out of on its own.
+    responses = iter(["1", "Groceries"])
+    with patch("builtins.input", lambda prompt="": next(responses)):
+        review_category(repo, "Train")
+
+    out = capsys.readouterr().out
+    assert "Moved to 'Groceries' — removed from this list." in out
+    assert repo.fetch_all()[0].category == "Groceries"

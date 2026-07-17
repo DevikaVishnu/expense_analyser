@@ -348,7 +348,17 @@ def _review_transactions(
         repo.update_category(txn.id, new_category)
         repo.set_merchant_rule(normalize_description(txn.description), new_category)
 
-        if category_filter is not None and new_category.lower() != category_filter.lower():
+        if category_filter is not None:
+            # Compare via _group_for_category so a group-name filter
+            # (e.g. reviewing "Train") keeps a transaction that moved
+            # between group members (Subway -> Amtrak is still Train)
+            # — for a plain category filter this is a no-op, since
+            # _group_for_category returns ungrouped categories unchanged.
+            still_belongs = _group_for_category(new_category).lower() == category_filter.lower()
+        else:
+            still_belongs = True
+
+        if category_filter is not None and not still_belongs:
             transactions.remove(txn)
             print(f"Moved to {new_category!r} — removed from this list.")
         else:
@@ -387,8 +397,22 @@ def review_category(repo: TransactionRepository, category: str) -> None:
     wrong in the report, what's actually in it?" A transaction moved
     elsewhere is removed from this list, so the total shown always
     reflects what's left still assigned to category.
+
+    If category is a CATEGORY_GROUPS group name (e.g. "Train"), this
+    shows the combined transactions of every member category (Subway
+    + Amtrak + LIRR) — no transaction is ever literally stored with
+    the group's name, so a plain fetch_by_category("Train") would
+    always come back empty.
     """
-    _review_transactions(repo, repo.fetch_by_category(category), label=category, category_filter=category)
+    if category in CATEGORY_GROUPS:
+        transactions = [
+            txn for member in CATEGORY_GROUPS[category] for txn in repo.fetch_by_category(member)
+        ]
+        transactions.sort(key=lambda txn: txn.transaction_date)
+    else:
+        transactions = repo.fetch_by_category(category)
+
+    _review_transactions(repo, transactions, label=category, category_filter=category)
 
 
 def main() -> None:
