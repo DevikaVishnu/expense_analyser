@@ -39,6 +39,14 @@ CATEGORIES = [
     "Miscellaneous",
 ]
 
+# Categories excluded from "total expenditure" figures even though some
+# represent real spending (Stony Brook does) — large, infrequent payments
+# that would distort what a normal period's spending looks like if netted
+# into the same total as day-to-day expenses. Still shown as their own
+# line wherever categories are broken out, just not folded into a
+# headline expenditure number. Extend as needed.
+SEPARATE_CATEGORIES = ["Stony Brook"]
+
 
 def _known_categories(repo: TransactionRepository) -> list[str]:
     """The fixed CATEGORIES list, extended with any category that has
@@ -240,6 +248,7 @@ def _review_transactions(
     transactions: list[Transaction],
     label: str,
     category_filter: str | None = None,
+    exclude_from_total: set[str] | None = None,
 ) -> None:
     """Show a running total + numbered list for transactions, then let
     the user selectively change any of their categories by number —
@@ -254,13 +263,21 @@ def _review_transactions(
     recomputed, rather than just having its label updated in place
     (which is what happens for review_month, where category_filter is
     None since the transaction's month never changes).
+
+    exclude_from_total, when set, leaves those categories in the
+    displayed list (nothing is hidden) but out of the printed total —
+    used by review_month so its number means the same "expenditure,
+    not net cash flow" thing as the reports (see reporting.py).
     """
     if not transactions:
         print(f"No transactions found for {label}.")
         return
 
     def print_state() -> None:
-        total = sum(txn.amount for txn in transactions)
+        if exclude_from_total:
+            total = sum(txn.amount for txn in transactions if txn.category not in exclude_from_total)
+        else:
+            total = sum(txn.amount for txn in transactions)
         print(f"\n{label} total: {format_amount(total)}")
         print(f"Transactions for {label}:")
         for i, txn in enumerate(transactions, start=1):
@@ -313,11 +330,15 @@ def _review_transactions(
 
 
 def review_month(repo: TransactionRepository, month: str) -> None:
-    """Show the total spend and every individual transaction for month
-    (format "YYYY-MM"), then let the user selectively fix any of their
-    categories.
+    """Show the total expenditure and every individual transaction for
+    month (format "YYYY-MM"), then let the user selectively fix any of
+    their categories. The total excludes INCOME_CATEGORY and
+    SEPARATE_CATEGORIES, same definition of "expenditure" as the
+    reports (see reporting.py) — though those transactions still show
+    up in the list itself, so nothing is hidden from review.
     """
-    _review_transactions(repo, repo.fetch_by_month(month), label=month)
+    excluded = {INCOME_CATEGORY, *SEPARATE_CATEGORIES}
+    _review_transactions(repo, repo.fetch_by_month(month), label=month, exclude_from_total=excluded)
 
 
 def review_category(repo: TransactionRepository, category: str) -> None:

@@ -312,6 +312,21 @@ def test_review_month_prints_total_and_transaction_list(capsys):
     assert "Groceries" in out
 
 
+def test_review_month_total_excludes_income_and_separate_categories_but_still_lists_them(capsys):
+    repo = TransactionRepository(":memory:")
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 5), amount=-500, category="Groceries"))
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 10), amount=265000, category=INCOME_CATEGORY))
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 15), amount=-1190069, category="Stony Brook"))
+
+    with patch("builtins.input", lambda prompt="": ""):
+        review_month(repo, "2026-01")
+
+    out = capsys.readouterr().out
+    assert "2026-01 total: -$5.00" in out
+    assert INCOME_CATEGORY in out
+    assert "Stony Brook" in out
+
+
 def test_review_month_changes_category_by_number():
     repo = TransactionRepository(":memory:")
     repo.insert(_make_transaction(transaction_date=date(2026, 1, 5), description="UBER *TRIP", amount=-500, category="Uber"))

@@ -9,20 +9,12 @@ import argparse
 import csv
 from pathlib import Path
 
-from expense_analyser.categorization import INCOME_CATEGORY
+from expense_analyser.categorization import INCOME_CATEGORY, SEPARATE_CATEGORIES
 from expense_analyser.formatting import format_amount
 from expense_analyser.storage import TransactionRepository
 
 DEFAULT_DB_PATH = "expenses.db"
 DEFAULT_REPORTS_DIR = "reports"
-
-# Categories excluded from the "total expenditure" figure even though
-# some represent real spending (Stony Brook does) — large, infrequent
-# payments that would distort what a normal month's spending looks
-# like if netted into the same total as day-to-day expenses. Still
-# shown as their own line in the category breakdown, just not folded
-# into the headline number. Extend as needed.
-SEPARATE_CATEGORIES = ["Stony Brook"]
 
 
 def _monthly_expenditure(repo: TransactionRepository) -> dict[str, int]:
