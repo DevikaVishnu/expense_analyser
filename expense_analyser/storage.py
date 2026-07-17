@@ -7,7 +7,13 @@ from expense_analyser.models import Transaction
 
 class TransactionRepository:
     def __init__(self, db_path: str):
-        self.connection = sqlite3.connect(db_path)
+        # check_same_thread=False: sqlite3 connections are thread-bound
+        # by default. We never share one connection across genuinely
+        # concurrent access (each CLI run and each FastAPI request gets
+        # its own TransactionRepository), but FastAPI's TestClient
+        # dispatches requests on a different thread than the one that
+        # creates the repo in a test, which the default would reject.
+        self.connection = sqlite3.connect(db_path, check_same_thread=False)
         self._create_tables()
 
     def _create_tables(self) -> None:
@@ -80,6 +86,10 @@ class TransactionRepository:
             "SELECT * FROM transactions WHERE strftime('%Y-%m', transaction_date) = ? ORDER BY transaction_date",
             (month,),
         )
+
+    def get_by_id(self, transaction_id: UUID) -> Transaction | None:
+        results = self._fetch("SELECT * FROM transactions WHERE id = ?", (str(transaction_id),))
+        return results[0] if results else None
 
     def fetch_by_category(self, category: str) -> list[Transaction]:
         # COLLATE NOCASE: category values are already casing-normalized
