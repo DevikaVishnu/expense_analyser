@@ -1,4 +1,5 @@
 const SVG_NS = "http://www.w3.org/2000/svg";
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function el(tag, attrs = {}) {
   const e = document.createElementNS(SVG_NS, tag);
@@ -11,19 +12,23 @@ function formatMoney(cents) {
   return `${sign}$${(Math.abs(cents) / 100).toFixed(2)}`;
 }
 
-// Rounds only the bar's "far" end (away from the zero baseline) — square
+// "2026-01" -> "Jan '26". Abbreviated + year (not just "Jan") since the
+// data can span a year boundary, where a bare month name is ambiguous.
+function formatMonthLabel(monthStr) {
+  const [year, month] = monthStr.split("-");
+  const monthIndex = parseInt(month, 10) - 1;
+  return `${MONTH_NAMES[monthIndex]} '${year.slice(2)}`;
+}
+
+// Rounds only the bar's "far" end (away from the baseline) — square
 // where it meets the baseline, per the mark spec.
 function roundedRectPath(x, y, width, height, radius, roundedEdge) {
   const r = Math.max(0, Math.min(radius, width / 2, height / 2));
   switch (roundedEdge) {
     case "top":
       return `M ${x} ${y + height} L ${x} ${y + r} Q ${x} ${y} ${x + r} ${y} L ${x + width - r} ${y} Q ${x + width} ${y} ${x + width} ${y + r} L ${x + width} ${y + height} Z`;
-    case "bottom":
-      return `M ${x} ${y} L ${x + width} ${y} L ${x + width} ${y + height - r} Q ${x + width} ${y + height} ${x + width - r} ${y + height} L ${x + r} ${y + height} Q ${x} ${y + height} ${x} ${y + height - r} Z`;
     case "right":
       return `M ${x} ${y} L ${x + width - r} ${y} Q ${x + width} ${y} ${x + width} ${y + r} L ${x + width} ${y + height - r} Q ${x + width} ${y + height} ${x + width - r} ${y + height} L ${x} ${y + height} Z`;
-    case "left":
-      return `M ${x + width} ${y} L ${x + r} ${y} Q ${x} ${y} ${x} ${y + r} L ${x} ${y + height - r} Q ${x} ${y + height} ${x + r} ${y + height} L ${x + width} ${y + height} Z`;
   }
 }
 
@@ -70,6 +75,13 @@ function hideTooltip() {
   if (tooltipEl) tooltipEl.classList.remove("visible");
 }
 
+// Both charts below plot magnitude (Math.abs of the underlying signed
+// cents) rather than the true signed value — "how much did I spend"
+// reads as a positive quantity, even though negative = spend
+// internally. That also means every bar grows the same direction from
+// a single baseline (no zero-crossing), so there's one rounded edge
+// per chart rather than a sign-dependent one.
+
 function renderMonthChart(container, months, onSelect, selectedMonth) {
   container.textContent = "";
   if (months.length === 0) {
@@ -83,15 +95,11 @@ function renderMonthChart(container, months, onSelect, selectedMonth) {
   const plotWidth = width - padding.left - padding.right;
   const plotHeight = height - padding.top - padding.bottom;
 
-  const values = months.map((m) => m.expenditure);
-  const maxVal = Math.max(0, ...values);
-  const minVal = Math.min(0, ...values);
-  const axisMax = niceMax(Math.max(Math.abs(maxVal), Math.abs(minVal)));
-  const rangeTop = maxVal > 0 ? axisMax : 0;
-  const rangeBottom = minVal < 0 ? -axisMax : 0;
-  const range = rangeTop - rangeBottom || 1;
+  const magnitudes = months.map((m) => Math.abs(m.expenditure));
+  const axisMax = niceMax(Math.max(...magnitudes, 0));
 
-  const scaleY = (value) => padding.top + ((rangeTop - value) / range) * plotHeight;
+  const scaleY = (value) => padding.top + (1 - value / axisMax) * plotHeight;
+  const baselineY = scaleY(0);
 
   const svg = el("svg", {
     viewBox: `0 0 ${width} ${height}`,
@@ -99,8 +107,7 @@ function renderMonthChart(container, months, onSelect, selectedMonth) {
     style: "width: 100%; height: auto;",
   });
 
-  [rangeTop, 0, rangeBottom].forEach((gridVal, i) => {
-    if (i > 0 && gridVal === 0 && rangeTop === 0) return;
+  [axisMax, axisMax / 2, 0].forEach((gridVal) => {
     const y = scaleY(gridVal);
     svg.appendChild(
       el("line", {
@@ -118,22 +125,20 @@ function renderMonthChart(container, months, onSelect, selectedMonth) {
 
   const bandWidth = plotWidth / months.length;
   const barWidth = Math.min(24, bandWidth * 0.6);
-  const zeroY = scaleY(0);
 
   months.forEach((m, i) => {
+    const magnitude = Math.abs(m.expenditure);
     const bandX = padding.left + i * bandWidth;
     const barX = bandX + (bandWidth - barWidth) / 2;
-    const valueY = scaleY(m.expenditure);
-    const barY = Math.min(zeroY, valueY);
-    const barHeight = Math.max(1, Math.abs(valueY - zeroY));
-    const roundedEdge = m.expenditure >= 0 ? "top" : "bottom";
+    const barTopY = scaleY(magnitude);
+    const barHeight = Math.max(1, baselineY - barTopY);
 
     const bar = el("path", {
-      d: roundedRectPath(barX, barY, barWidth, barHeight, 4, roundedEdge),
+      d: roundedRectPath(barX, barTopY, barWidth, barHeight, 4, "top"),
       class: "bar" + (m.month === selectedMonth ? " selected" : ""),
     });
     bar.addEventListener("click", () => onSelect(m.month));
-    bar.addEventListener("pointermove", (evt) => showTooltip(evt, m.month, formatMoney(m.expenditure)));
+    bar.addEventListener("pointermove", (evt) => showTooltip(evt, formatMonthLabel(m.month), formatMoney(magnitude)));
     bar.addEventListener("pointerleave", hideTooltip);
     svg.appendChild(bar);
 
@@ -143,21 +148,21 @@ function renderMonthChart(container, months, onSelect, selectedMonth) {
       "text-anchor": "middle",
       class: "axis-label",
     });
-    monthLabel.textContent = m.month.slice(5);
+    monthLabel.textContent = formatMonthLabel(m.month);
     svg.appendChild(monthLabel);
   });
 
   // Direct label only on the most recent month — selective, not one per bar.
   const last = months[months.length - 1];
+  const lastMagnitude = Math.abs(last.expenditure);
   const lastX = padding.left + (months.length - 1) * bandWidth + bandWidth / 2;
-  const lastY = scaleY(last.expenditure);
   const lastLabel = el("text", {
     x: lastX,
-    y: last.expenditure >= 0 ? lastY - 8 : lastY + 16,
+    y: scaleY(lastMagnitude) - 8,
     "text-anchor": "middle",
     class: "value-label",
   });
-  lastLabel.textContent = formatMoney(last.expenditure);
+  lastLabel.textContent = formatMoney(lastMagnitude);
   svg.appendChild(lastLabel);
 
   container.appendChild(svg);
@@ -176,16 +181,10 @@ function renderCategoryChart(container, categories) {
   const plotWidth = width - padding.left - padding.right;
   const height = padding.top + padding.bottom + categories.length * rowHeight;
 
-  const values = categories.map((c) => c.total);
-  const maxVal = Math.max(0, ...values);
-  const minVal = Math.min(0, ...values);
-  const axisMax = niceMax(Math.max(Math.abs(maxVal), Math.abs(minVal)));
-  const rangeRight = maxVal > 0 ? axisMax : 0;
-  const rangeLeft = minVal < 0 ? -axisMax : 0;
-  const range = rangeRight - rangeLeft || 1;
+  const magnitudes = categories.map((c) => Math.abs(c.total));
+  const axisMax = niceMax(Math.max(...magnitudes, 0));
 
-  const scaleX = (value) => padding.left + ((value - rangeLeft) / range) * plotWidth;
-  const zeroX = scaleX(0);
+  const scaleX = (value) => padding.left + (value / axisMax) * plotWidth;
 
   const svg = el("svg", {
     viewBox: `0 0 ${width} ${height}`,
@@ -194,24 +193,22 @@ function renderCategoryChart(container, categories) {
   });
 
   svg.appendChild(
-    el("line", { x1: zeroX, x2: zeroX, y1: padding.top, y2: height - padding.bottom, class: "baseline" })
+    el("line", { x1: padding.left, x2: padding.left, y1: padding.top, y2: height - padding.bottom, class: "baseline" })
   );
 
-  let extreme = categories[0];
+  let extremeIndex = 0;
   categories.forEach((c, i) => {
+    const magnitude = Math.abs(c.total);
     const rowY = padding.top + i * rowHeight;
     const barHeight = Math.min(24, rowHeight * 0.6);
     const barY = rowY + (rowHeight - barHeight) / 2;
-    const valueX = scaleX(c.total);
-    const barX = Math.min(zeroX, valueX);
-    const barWidth = Math.max(1, Math.abs(valueX - zeroX));
-    const roundedEdge = c.total >= 0 ? "right" : "left";
+    const barWidth = Math.max(1, scaleX(magnitude) - padding.left);
 
     const bar = el("path", {
-      d: roundedRectPath(barX, barY, barWidth, barHeight, 4, roundedEdge),
+      d: roundedRectPath(padding.left, barY, barWidth, barHeight, 4, "right"),
       class: "bar",
     });
-    bar.addEventListener("pointermove", (evt) => showTooltip(evt, c.category, formatMoney(c.total)));
+    bar.addEventListener("pointermove", (evt) => showTooltip(evt, c.category, formatMoney(magnitude)));
     bar.addEventListener("pointerleave", hideTooltip);
     svg.appendChild(bar);
 
@@ -224,20 +221,20 @@ function renderCategoryChart(container, categories) {
     catLabel.textContent = c.category;
     svg.appendChild(catLabel);
 
-    if (Math.abs(c.total) > Math.abs(extreme.total)) extreme = c;
+    if (magnitude > Math.abs(categories[extremeIndex].total)) extremeIndex = i;
   });
 
   // Direct label only on the largest-magnitude category.
-  const extremeIndex = categories.indexOf(extreme);
+  const extreme = categories[extremeIndex];
+  const extremeMagnitude = Math.abs(extreme.total);
   const extremeRowY = padding.top + extremeIndex * rowHeight;
-  const extremeValueX = scaleX(extreme.total);
   const extremeLabel = el("text", {
-    x: extreme.total >= 0 ? extremeValueX + 6 : extremeValueX - 6,
+    x: scaleX(extremeMagnitude) + 6,
     y: extremeRowY + rowHeight / 2 + 4,
-    "text-anchor": extreme.total >= 0 ? "start" : "end",
+    "text-anchor": "start",
     class: "value-label",
   });
-  extremeLabel.textContent = formatMoney(extreme.total);
+  extremeLabel.textContent = formatMoney(extremeMagnitude);
   svg.appendChild(extremeLabel);
 
   container.appendChild(svg);
@@ -301,7 +298,7 @@ async function selectMonth(month) {
   renderMonthChart(document.getElementById("month-chart"), allMonths, selectMonth, month);
 
   const summary = allMonths.find((m) => m.month === month);
-  document.getElementById("hero-month").textContent = month;
+  document.getElementById("hero-month").textContent = formatMonthLabel(month);
   document.getElementById("hero-value").textContent = formatMoney(summary.expenditure);
   const separateEntries = Object.entries(summary.separate_totals || {});
   document.getElementById("hero-extra").textContent = separateEntries
@@ -312,7 +309,10 @@ async function selectMonth(month) {
     fetchJSON(`/api/months/${month}/categories`),
     fetchJSON(`/api/months/${month}/transactions`),
   ]);
-  renderCategoryChart(document.getElementById("category-chart"), categories);
+  // Income isn't spend, so it doesn't belong on a spend-by-category chart —
+  // it's still visible in the hero figure and the transaction table below.
+  const spendCategories = categories.filter((c) => c.category !== "Income");
+  renderCategoryChart(document.getElementById("category-chart"), spendCategories);
   renderTransactionTable(document.getElementById("transaction-table"), transactions);
 }
 
