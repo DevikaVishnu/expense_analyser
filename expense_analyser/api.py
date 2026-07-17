@@ -20,7 +20,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from expense_analyser.categorization import INCOME_CATEGORY, SEPARATE_CATEGORIES, normalize_description
+from expense_analyser.categorization import CATEGORY_GROUPS, INCOME_CATEGORY, SEPARATE_CATEGORIES, normalize_description
 from expense_analyser.models import Transaction
 from expense_analyser.reporting import _apply_category_groups, _monthly_breakdown
 from expense_analyser.storage import TransactionRepository
@@ -75,6 +75,24 @@ def list_month_categories(
         CategoryTotal(category=category or "Uncategorized", total=total)
         for category, total in _apply_category_groups(repo.spend_by_category_for_month(month))
         if category not in excluded
+    ]
+
+
+@app.get("/api/months/{month}/categories/{group}", response_model=list[CategoryTotal])
+def list_group_members(
+    month: str, group: str, repo: TransactionRepository = Depends(get_repo)
+) -> list[CategoryTotal]:
+    # Empty list (not a 404) for a name that isn't a CATEGORY_GROUPS
+    # group — the frontend uses "got nothing back" to mean "this bar
+    # isn't a group, don't show a sub-breakdown" rather than treating
+    # every ordinary category as an error case.
+    members = set(CATEGORY_GROUPS.get(group, []))
+    if not members:
+        return []
+    return [
+        CategoryTotal(category=category or "Uncategorized", total=total)
+        for category, total in repo.spend_by_category_for_month(month)
+        if category in members
     ]
 
 

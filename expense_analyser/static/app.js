@@ -168,7 +168,7 @@ function renderMonthChart(container, months, onSelect, selectedMonth) {
   container.appendChild(svg);
 }
 
-function renderCategoryChart(container, categories) {
+function renderCategoryChart(container, categories, onBarClick) {
   container.textContent = "";
   if (categories.length === 0) {
     container.innerHTML = '<p class="empty-state">No transactions.</p>';
@@ -210,6 +210,7 @@ function renderCategoryChart(container, categories) {
     });
     bar.addEventListener("pointermove", (evt) => showTooltip(evt, c.category, formatMoney(magnitude)));
     bar.addEventListener("pointerleave", hideTooltip);
+    if (onBarClick) bar.addEventListener("click", () => onBarClick(c.category));
     svg.appendChild(bar);
 
     const catLabel = el("text", {
@@ -294,6 +295,25 @@ async function fetchJSON(url) {
 
 let allMonths = [];
 
+// A category bar (e.g. "Train") may be a CATEGORY_GROUPS rollup —
+// GET .../categories/{name} comes back empty for an ordinary category
+// (nothing to expand) and non-empty for a group (its real members),
+// so the same click handler works for every bar without the frontend
+// needing to know in advance which ones are groups.
+async function showGroupBreakdown(month, category) {
+  const card = document.getElementById("subcategory-card");
+  const members = await fetchJSON(`/api/months/${month}/categories/${encodeURIComponent(category)}`);
+
+  if (members.length === 0) {
+    card.hidden = true;
+    return;
+  }
+
+  card.hidden = false;
+  document.getElementById("subcategory-heading").textContent = `${category} breakdown`;
+  renderCategoryChart(document.getElementById("subcategory-chart"), members);
+}
+
 async function selectMonth(month) {
   renderMonthChart(document.getElementById("month-chart"), allMonths, selectMonth, month);
 
@@ -305,6 +325,10 @@ async function selectMonth(month) {
     .map(([cat, total]) => `${cat}: ${formatMoney(total)}`)
     .join(", ");
 
+  // The previously selected group's breakdown no longer applies once
+  // the month changes.
+  document.getElementById("subcategory-card").hidden = true;
+
   const [categories, transactions] = await Promise.all([
     fetchJSON(`/api/months/${month}/categories`),
     fetchJSON(`/api/months/${month}/transactions`),
@@ -312,7 +336,9 @@ async function selectMonth(month) {
   // The API already excludes Income and SEPARATE_CATEGORIES (e.g.
   // Stony Brook) from this endpoint — both stay visible in the hero
   // figure above, just not on a chart they'd otherwise dominate.
-  renderCategoryChart(document.getElementById("category-chart"), categories);
+  renderCategoryChart(document.getElementById("category-chart"), categories, (category) =>
+    showGroupBreakdown(month, category)
+  );
   renderTransactionTable(document.getElementById("transaction-table"), transactions);
 }
 

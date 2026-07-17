@@ -101,6 +101,28 @@ def test_list_month_categories_excludes_separate_categories():
     assert response.json() == [{"category": "Groceries", "total": -500}]
 
 
+def test_list_group_members_returns_member_breakdown():
+    repo = TransactionRepository(":memory:")
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 5), amount=-500, category="Subway"))
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 10), amount=-300, category="Amtrak"))
+
+    response = _client_with_repo(repo).get("/api/months/2026-01/categories/Train")
+
+    assert response.status_code == 200
+    body = {row["category"]: row["total"] for row in response.json()}
+    assert body == {"Subway": -500, "Amtrak": -300}
+
+
+def test_list_group_members_empty_for_non_group_category():
+    repo = TransactionRepository(":memory:")
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 5), amount=-500, category="Groceries"))
+
+    response = _client_with_repo(repo).get("/api/months/2026-01/categories/Groceries")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
 def test_list_month_transactions_returns_only_that_months_transactions():
     repo = TransactionRepository(":memory:")
     repo.insert(_make_transaction(transaction_date=date(2026, 1, 5), description="UBER *TRIP"))
