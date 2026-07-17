@@ -9,6 +9,7 @@ categorized every single time it shows up in a future statement.
 
 import argparse
 
+from expense_analyser.formatting import format_amount
 from expense_analyser.models import Transaction
 from expense_analyser.storage import TransactionRepository
 
@@ -149,8 +150,7 @@ def categorize_interactively(repo: TransactionRepository) -> None:
         key = normalize_description(txn.description)
         suggested = repo.get_merchant_rule(key)
 
-        sign = "-" if txn.amount < 0 else ""
-        amount_display = f"{sign}${abs(txn.amount) / 100:.2f}"
+        amount_display = format_amount(txn.amount)
 
         if suggested:
             repo.update_category(txn.id, suggested)
@@ -212,10 +212,8 @@ def recategorize(repo: TransactionRepository, search_term: str) -> None:
 
     print(f"\nFound {len(matches)} transaction(s) matching {search_term!r}:")
     for txn in matches:
-        sign = "-" if txn.amount < 0 else ""
-        amount_display = f"{sign}${abs(txn.amount) / 100:.2f}"
         current = txn.category or "Uncategorized"
-        print(f"  {txn.transaction_date} | {amount_display} | {txn.description} | currently: {current}")
+        print(f"  {txn.transaction_date} | {format_amount(txn.amount)} | {txn.description} | currently: {current}")
 
     known_categories = _known_categories(repo)
     options = ", ".join(f"{i + 1}) {c}" for i, c in enumerate(known_categories))
@@ -237,6 +235,58 @@ def recategorize(repo: TransactionRepository, search_term: str) -> None:
     print(f"\nUpdated {len(matches)} transaction(s) to {new_category!r}.")
 
 
+def review_month(repo: TransactionRepository, month: str) -> None:
+    """Show the total spend and every individual transaction for month
+    (format "YYYY-MM"), then let the user selectively change the
+    category of any of them by number — as many times as needed, not
+    a forced one-by-one pass through every transaction.
+    """
+    transactions = repo.fetch_by_month(month)
+
+    if not transactions:
+        print(f"No transactions found for {month}.")
+        return
+
+    total = sum(txn.amount for txn in transactions)
+    print(f"\n{month} total: {format_amount(total)}")
+
+    print(f"\nTransactions for {month}:")
+    for i, txn in enumerate(transactions, start=1):
+        category = txn.category or "Uncategorized"
+        print(f"  {i}. {txn.transaction_date} | {format_amount(txn.amount):>10} | {txn.description} | {category}")
+
+    known_categories = _known_categories(repo)
+
+    while True:
+        choice = input("\nEnter a number to change its category (or press Enter to finish): ").strip()
+        if not choice:
+            break
+
+        if not choice.isdigit() or not (1 <= int(choice) <= len(transactions)):
+            print("Not a valid transaction number.")
+            continue
+
+        txn = transactions[int(choice) - 1]
+        options = ", ".join(f"{i + 1}) {c}" for i, c in enumerate(known_categories))
+        print(f"Categories: {options}")
+        response = input(f"New category for {txn.description!r} (number or new name): ").strip()
+
+        if response.isdigit() and 1 <= int(response) <= len(known_categories):
+            new_category = known_categories[int(response) - 1]
+        elif response:
+            new_category = _resolve_category(response, known_categories)
+            if new_category not in known_categories:
+                known_categories.append(new_category)
+        else:
+            print("No category entered, unchanged.")
+            continue
+
+        repo.update_category(txn.id, new_category)
+        repo.set_merchant_rule(normalize_description(txn.description), new_category)
+        txn.category = new_category
+        print(f"Updated to {new_category!r}.")
+
+
 def main() -> None:
     arg_parser = argparse.ArgumentParser(description="Interactively categorize uncategorized transactions.")
     arg_parser.add_argument(
@@ -253,12 +303,23 @@ def main() -> None:
             "uncategorized-only flow."
         ),
     )
+    arg_parser.add_argument(
+        "--review",
+        metavar="MONTH",
+        help=(
+            "Show the total spend and every transaction for MONTH (YYYY-MM), "
+            "and optionally change any of their categories, instead of the "
+            "normal uncategorized-only flow."
+        ),
+    )
     args = arg_parser.parse_args()
 
     repo = TransactionRepository(args.db_path)
 
     if args.recategorize:
         recategorize(repo, args.recategorize)
+    elif args.review:
+        review_month(repo, args.review)
     else:
         categorize_interactively(repo)
 

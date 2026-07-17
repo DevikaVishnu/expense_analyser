@@ -17,8 +17,9 @@ PDF statement  --(parser)-->  Transaction  --(repository)-->  SQLite
 - **`expense_analyser/parsers/registry.py`** — `PARSER_REGISTRY`, mapping a folder-path key (e.g. `"IslandFederal_checking/bank_statement"`) to the parser class that understands it. Adding a new source means writing one new parser class and one registry entry — no other code changes.
 - **`expense_analyser/storage.py`** — `TransactionRepository`, a thin wrapper around SQLite. Inserts are idempotent (`INSERT OR IGNORE` + a `UNIQUE` constraint on a content hash), so re-ingesting overlapping statements is safe.
 - **`expense_analyser/ingest.py`** — the ingestion CLI. Walks `expense_reports/`, looks up the right parser per folder via `PARSER_REGISTRY`, and stores the results. Folders with no matching registry entry are skipped with a warning rather than crashing the run.
-- **`expense_analyser/categorization.py`** — the categorization CLI. Genuine deposits and known merchants are auto-labeled without prompting (a merchant rule, once set, applies itself to every future transaction from that merchant — including refunds, which share the original purchase's description); only genuinely new merchants stop and ask. `recategorize()` bulk-fixes an already-categorized merchant by search term if a rule was ever set wrong.
+- **`expense_analyser/categorization.py`** — the categorization CLI. Genuine deposits and known merchants are auto-labeled without prompting (a merchant rule, once set, applies itself to every future transaction from that merchant — including refunds, which share the original purchase's description); only genuinely new merchants stop and ask. `recategorize()` bulk-fixes an already-categorized merchant by search term; `review_month()` shows a given month's total and every transaction in it, letting you selectively fix any of their categories.
 - **`expense_analyser/reporting.py`** — spend-by-category, spend-by-month, and spend-by-month-and-category reports, printed to the terminal and exported to `reports/` as CSV. Amounts are summed net of refunds within each category/month.
+- **`expense_analyser/formatting.py`** — `format_amount`, the shared "signed integer cents -> human-readable dollar string" helper used by both `categorization.py` and `reporting.py`.
 
 ### Folder convention for statements
 
@@ -75,6 +76,12 @@ Deposits and refunds are handled automatically (see `categorization.py` above); 
 
 ```
 python3 -m expense_analyser.categorization --recategorize "search term"
+```
+
+To see a given month's total spend and every individual transaction in it (and fix any of their categories on the spot):
+
+```
+python3 -m expense_analyser.categorization --review 2026-01
 ```
 
 Finally, generate reports:

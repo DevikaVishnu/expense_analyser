@@ -111,6 +111,18 @@ def test_search_by_description_no_matches_returns_empty_list():
     assert repo.search_by_description("nonexistent") == []
 
 
+def test_fetch_by_month_filters_by_year_month():
+    repo = TransactionRepository(":memory:")
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 5), amount=-100))
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 20), amount=-200))
+    repo.insert(_make_transaction(transaction_date=date(2026, 2, 1), amount=-300))
+
+    january = repo.fetch_by_month("2026-01")
+
+    assert len(january) == 2
+    assert {t.amount for t in january} == {-100, -200}
+
+
 def test_get_all_categories_returns_distinct_used_categories():
     repo = TransactionRepository(":memory:")
     repo.insert(_make_transaction(amount=-100, category="Groceries"))

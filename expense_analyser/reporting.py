@@ -9,28 +9,24 @@ import argparse
 import csv
 from pathlib import Path
 
+from expense_analyser.formatting import format_amount
 from expense_analyser.storage import TransactionRepository
 
 DEFAULT_DB_PATH = "expenses.db"
 DEFAULT_REPORTS_DIR = "reports"
 
 
-def _format_amount(cents: int) -> str:
-    sign = "-" if cents < 0 else ""
-    return f"{sign}${abs(cents) / 100:.2f}"
-
-
 def print_spend_by_category(repo: TransactionRepository) -> None:
     print("\nSpend by category:")
     for category, total in repo.spend_by_category():
         label = category or "Uncategorized"
-        print(f"  {label:<25} {_format_amount(total):>12}")
+        print(f"  {label:<25} {format_amount(total):>12}")
 
 
 def print_spend_by_month(repo: TransactionRepository) -> None:
     print("\nSpend by month:")
     for month, total in repo.spend_by_month():
-        print(f"  {month:<25} {_format_amount(total):>12}")
+        print(f"  {month:<25} {format_amount(total):>12}")
 
 
 def print_spend_by_month_and_category(repo: TransactionRepository) -> None:
@@ -44,7 +40,7 @@ def print_spend_by_month_and_category(repo: TransactionRepository) -> None:
             print(f"\n  {month}:")
             current_month = month
         label = category or "Uncategorized"
-        print(f"    {label:<25} {_format_amount(total):>12}")
+        print(f"    {label:<25} {format_amount(total):>12}")
 
 
 def write_csv(rows: list[tuple], headers: list[str], path: Path) -> None:

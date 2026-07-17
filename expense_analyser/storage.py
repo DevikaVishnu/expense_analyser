@@ -75,6 +75,12 @@ class TransactionRepository:
             (f"%{search_term}%",),
         )
 
+    def fetch_by_month(self, month: str) -> list[Transaction]:
+        return self._fetch(
+            "SELECT * FROM transactions WHERE strftime('%Y-%m', transaction_date) = ? ORDER BY transaction_date",
+            (month,),
+        )
+
     def get_all_categories(self) -> list[str]:
         cursor = self.connection.execute(
             "SELECT DISTINCT category FROM transactions WHERE category IS NOT NULL ORDER BY category"

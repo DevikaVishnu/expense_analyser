@@ -2,7 +2,6 @@ from datetime import date
 
 from expense_analyser.models import Transaction
 from expense_analyser.reporting import (
-    _format_amount,
     generate_reports,
     print_spend_by_category,
     print_spend_by_month,
@@ -24,18 +23,6 @@ def _make_transaction(**overrides) -> Transaction:
     )
     defaults.update(overrides)
     return Transaction(**defaults)
-
-
-def test_format_amount_negative():
-    assert _format_amount(-1234) == "-$12.34"
-
-
-def test_format_amount_positive():
-    assert _format_amount(1234) == "$12.34"
-
-
-def test_format_amount_zero():
-    assert _format_amount(0) == "$0.00"
 
 
 def test_print_spend_by_category_shows_uncategorized_label(capsys):

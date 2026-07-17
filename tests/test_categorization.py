@@ -9,6 +9,7 @@ from expense_analyser.categorization import (
     categorize_interactively,
     normalize_description,
     recategorize,
+    review_month,
 )
 from expense_analyser.models import Transaction
 from expense_analyser.storage import TransactionRepository
@@ -283,3 +284,62 @@ def test_recategorize_blank_response_makes_no_changes():
         recategorize(repo, "starbucks")
 
     assert repo.fetch_all()[0].category == "Eat Out"
+
+
+# --- review_month ---
+
+
+def test_review_month_no_transactions(capsys):
+    repo = TransactionRepository(":memory:")
+
+    review_month(repo, "2026-01")
+
+    assert "No transactions found for 2026-01" in capsys.readouterr().out
+
+
+def test_review_month_prints_total_and_transaction_list(capsys):
+    repo = TransactionRepository(":memory:")
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 5), amount=-500, category="Uber"))
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 10), amount=-2000, category="Groceries"))
+
+    with patch("builtins.input", lambda prompt="": ""):
+        review_month(repo, "2026-01")
+
+    out = capsys.readouterr().out
+    assert "2026-01 total: -$25.00" in out
+    assert "Uber" in out
+    assert "Groceries" in out
+
+
+def test_review_month_changes_category_by_number():
+    repo = TransactionRepository(":memory:")
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 5), description="UBER *TRIP", amount=-500, category="Uber"))
+
+    eat_out_number = str(CATEGORIES.index("Eat Out") + 1)
+    responses = iter(["1", eat_out_number, ""])
+    with patch("builtins.input", lambda prompt="": next(responses)):
+        review_month(repo, "2026-01")
+
+    assert repo.fetch_all()[0].category == "Eat Out"
+    assert repo.get_merchant_rule("UBER *TRIP") == "Eat Out"
+
+
+def test_review_month_invalid_transaction_number_does_not_crash():
+    repo = TransactionRepository(":memory:")
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 5), amount=-500, category="Uber"))
+
+    responses = iter(["99", ""])
+    with patch("builtins.input", lambda prompt="": next(responses)):
+        review_month(repo, "2026-01")
+
+    assert repo.fetch_all()[0].category == "Uber"
+
+
+def test_review_month_blank_response_finishes_without_changes():
+    repo = TransactionRepository(":memory:")
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 5), amount=-500, category="Uber"))
+
+    with patch("builtins.input", lambda prompt="": ""):
+        review_month(repo, "2026-01")
+
+    assert repo.fetch_all()[0].category == "Uber"
