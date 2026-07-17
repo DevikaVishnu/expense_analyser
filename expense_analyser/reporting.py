@@ -33,6 +33,20 @@ def print_spend_by_month(repo: TransactionRepository) -> None:
         print(f"  {month:<25} {_format_amount(total):>12}")
 
 
+def print_spend_by_month_and_category(repo: TransactionRepository) -> None:
+    print("\nSpend by month and category:")
+    current_month = None
+    # Rows arrive pre-sorted by month (spend_by_month_and_category's SQL
+    # does GROUP BY month, category ORDER BY month, ...), so a month
+    # header only needs printing when the month actually changes.
+    for month, category, total in repo.spend_by_month_and_category():
+        if month != current_month:
+            print(f"\n  {month}:")
+            current_month = month
+        label = category or "Uncategorized"
+        print(f"    {label:<25} {_format_amount(total):>12}")
+
+
 def write_csv(rows: list[tuple], headers: list[str], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", newline="") as f:
@@ -45,12 +59,23 @@ def write_csv(rows: list[tuple], headers: list[str], path: Path) -> None:
             writer.writerow([label or "Uncategorized", f"{total_cents / 100:.2f}"])
 
 
+def write_month_category_csv(rows: list[tuple], path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["month", "category", "total"])
+        for month, category, total_cents in rows:
+            writer.writerow([month, category or "Uncategorized", f"{total_cents / 100:.2f}"])
+
+
 def generate_reports(repo: TransactionRepository, reports_dir: Path) -> None:
     print_spend_by_category(repo)
     print_spend_by_month(repo)
+    print_spend_by_month_and_category(repo)
 
     write_csv(repo.spend_by_category(), ["category", "total"], reports_dir / "spend_by_category.csv")
     write_csv(repo.spend_by_month(), ["month", "total"], reports_dir / "spend_by_month.csv")
+    write_month_category_csv(repo.spend_by_month_and_category(), reports_dir / "spend_by_month_and_category.csv")
 
     print(f"\nCSV reports written to {reports_dir}/")
 
