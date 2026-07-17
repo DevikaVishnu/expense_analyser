@@ -322,7 +322,7 @@ def test_review_month_total_excludes_income_and_separate_categories_but_still_li
         review_month(repo, "2026-01")
 
     out = capsys.readouterr().out
-    assert "2026-01 total: -$5.00" in out
+    assert "2026-01 total: -$5.00  (Stony Brook: -$11900.69)" in out
     assert INCOME_CATEGORY in out
     assert "Stony Brook" in out
 

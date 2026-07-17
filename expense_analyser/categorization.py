@@ -249,6 +249,7 @@ def _review_transactions(
     label: str,
     category_filter: str | None = None,
     exclude_from_total: set[str] | None = None,
+    separate_totals_for: set[str] | None = None,
 ) -> None:
     """Show a running total + numbered list for transactions, then let
     the user selectively change any of their categories by number —
@@ -264,21 +265,34 @@ def _review_transactions(
     (which is what happens for review_month, where category_filter is
     None since the transaction's month never changes).
 
-    exclude_from_total, when set, leaves those categories in the
-    displayed list (nothing is hidden) but out of the printed total —
-    used by review_month so its number means the same "expenditure,
-    not net cash flow" thing as the reports (see reporting.py).
+    exclude_from_total categories are dropped from the printed total
+    entirely and not called out separately (e.g. INCOME_CATEGORY —
+    not spending at all). separate_totals_for categories are also
+    excluded from the total, but each gets its own value printed
+    alongside it (e.g. SEPARATE_CATEGORIES like Stony Brook — real
+    spending, just tracked apart from routine expenditure). Both
+    leave the transactions in the displayed list either way — nothing
+    is hidden from review, only from the headline number.
     """
     if not transactions:
         print(f"No transactions found for {label}.")
         return
 
     def print_state() -> None:
-        if exclude_from_total:
-            total = sum(txn.amount for txn in transactions if txn.category not in exclude_from_total)
-        else:
-            total = sum(txn.amount for txn in transactions)
-        print(f"\n{label} total: {format_amount(total)}")
+        excluded = (exclude_from_total or set()) | (separate_totals_for or set())
+        total = sum(txn.amount for txn in transactions if txn.category not in excluded)
+
+        extra = ""
+        if separate_totals_for:
+            separate_amounts = {}
+            for txn in transactions:
+                if txn.category in separate_totals_for:
+                    separate_amounts[txn.category] = separate_amounts.get(txn.category, 0) + txn.amount
+            if separate_amounts:
+                parts = ", ".join(f"{cat}: {format_amount(amt)}" for cat, amt in separate_amounts.items())
+                extra = f"  ({parts})"
+
+        print(f"\n{label} total: {format_amount(total)}{extra}")
         print(f"Transactions for {label}:")
         for i, txn in enumerate(transactions, start=1):
             category = txn.category or "Uncategorized"
@@ -332,13 +346,19 @@ def _review_transactions(
 def review_month(repo: TransactionRepository, month: str) -> None:
     """Show the total expenditure and every individual transaction for
     month (format "YYYY-MM"), then let the user selectively fix any of
-    their categories. The total excludes INCOME_CATEGORY and
-    SEPARATE_CATEGORIES, same definition of "expenditure" as the
-    reports (see reporting.py) — though those transactions still show
-    up in the list itself, so nothing is hidden from review.
+    their categories. The total excludes INCOME_CATEGORY entirely and
+    calls out SEPARATE_CATEGORIES (e.g. Stony Brook) as their own
+    separate value — same definition as the reports (see
+    reporting.py) — though those transactions still show up in the
+    list itself, so nothing is hidden from review.
     """
-    excluded = {INCOME_CATEGORY, *SEPARATE_CATEGORIES}
-    _review_transactions(repo, repo.fetch_by_month(month), label=month, exclude_from_total=excluded)
+    _review_transactions(
+        repo,
+        repo.fetch_by_month(month),
+        label=month,
+        exclude_from_total={INCOME_CATEGORY},
+        separate_totals_for=set(SEPARATE_CATEGORIES),
+    )
 
 
 def review_category(repo: TransactionRepository, category: str) -> None:

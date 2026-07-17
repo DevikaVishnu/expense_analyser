@@ -17,20 +17,38 @@ DEFAULT_DB_PATH = "expenses.db"
 DEFAULT_REPORTS_DIR = "reports"
 
 
-def _monthly_expenditure(repo: TransactionRepository) -> dict[str, int]:
-    """Total spend per month, counting only actual routine expenses —
-    excludes INCOME_CATEGORY (not spending at all, so netting it in
-    would understate how much actually went out) and
-    SEPARATE_CATEGORIES (real spending, but tracked apart from
-    routine expenditure since it's large and irregular).
+def _monthly_breakdown(repo: TransactionRepository) -> tuple[dict[str, int], dict[str, dict[str, int]]]:
+    """Splits each month's transactions into routine expenditure vs.
+    SEPARATE_CATEGORIES totals. INCOME_CATEGORY is dropped from both —
+    it isn't spending at all, so it belongs in neither bucket.
+
+    Returns (expenditure_by_month, separate_by_month):
+    - expenditure_by_month: month -> total, routine spend only.
+    - separate_by_month: month -> {category: total}, one entry per
+      SEPARATE_CATEGORIES category with transactions that month — the
+      exact amounts left out of the expenditure figure, so they stay
+      visible as their own value instead of being merged in or hidden.
     """
-    excluded = {INCOME_CATEGORY, *SEPARATE_CATEGORIES}
-    totals: dict[str, int] = {}
+    separate_categories = set(SEPARATE_CATEGORIES)
+    expenditure: dict[str, int] = {}
+    separate: dict[str, dict[str, int]] = {}
+
     for month, category, total in repo.spend_by_month_and_category():
-        if category in excluded:
+        if category == INCOME_CATEGORY:
             continue
-        totals[month] = totals.get(month, 0) + total
-    return totals
+        if category in separate_categories:
+            separate.setdefault(month, {})[category] = total
+        else:
+            expenditure[month] = expenditure.get(month, 0) + total
+
+    return expenditure, separate
+
+
+def _format_separate_totals(separate_for_month: dict[str, int] | None) -> str:
+    if not separate_for_month:
+        return ""
+    parts = ", ".join(f"{category}: {format_amount(total)}" for category, total in separate_for_month.items())
+    return f"  ({parts})"
 
 
 def print_spend_by_category(repo: TransactionRepository) -> None:
@@ -41,13 +59,15 @@ def print_spend_by_category(repo: TransactionRepository) -> None:
 
 
 def print_spend_by_month(repo: TransactionRepository) -> None:
+    expenditure, separate = _monthly_breakdown(repo)
+
     print("\nTotal expenditure by month:")
-    for month, total in sorted(_monthly_expenditure(repo).items()):
-        print(f"  {month:<25} {format_amount(total):>12}")
+    for month, total in sorted(expenditure.items()):
+        print(f"  {month:<25} {format_amount(total):>12}{_format_separate_totals(separate.get(month))}")
 
 
 def print_spend_by_month_and_category(repo: TransactionRepository) -> None:
-    monthly_totals = _monthly_expenditure(repo)
+    expenditure, separate = _monthly_breakdown(repo)
 
     print("\nSpend by month and category:")
     current_month = None
@@ -56,7 +76,8 @@ def print_spend_by_month_and_category(repo: TransactionRepository) -> None:
     # header only needs printing when the month actually changes.
     for month, category, total in repo.spend_by_month_and_category():
         if month != current_month:
-            print(f"\n  {month} (expenditure: {format_amount(monthly_totals[month])}):")
+            extra = _format_separate_totals(separate.get(month))
+            print(f"\n  {month} (expenditure: {format_amount(expenditure[month])}{extra}):")
             current_month = month
         label = category or "Uncategorized"
         print(f"    {label:<25} {format_amount(total):>12}")
@@ -88,8 +109,10 @@ def generate_reports(repo: TransactionRepository, reports_dir: Path) -> None:
     print_spend_by_month(repo)
     print_spend_by_month_and_category(repo)
 
+    expenditure, _ = _monthly_breakdown(repo)
+
     write_csv(repo.spend_by_category(), ["category", "total"], reports_dir / "spend_by_category.csv")
-    write_csv(sorted(_monthly_expenditure(repo).items()), ["month", "total"], reports_dir / "spend_by_month.csv")
+    write_csv(sorted(expenditure.items()), ["month", "total"], reports_dir / "spend_by_month.csv")
     write_month_category_csv(repo.spend_by_month_and_category(), reports_dir / "spend_by_month_and_category.csv")
 
     print(f"\nCSV reports written to {reports_dir}/")

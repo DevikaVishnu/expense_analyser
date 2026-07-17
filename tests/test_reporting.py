@@ -3,7 +3,7 @@ from datetime import date
 from expense_analyser.categorization import INCOME_CATEGORY
 from expense_analyser.models import Transaction
 from expense_analyser.reporting import (
-    _monthly_expenditure,
+    _monthly_breakdown,
     generate_reports,
     print_spend_by_category,
     print_spend_by_month,
@@ -61,28 +61,48 @@ def test_print_spend_by_month_groups_by_month(capsys):
     assert "2026-02" in out
 
 
-def test_monthly_expenditure_excludes_income():
+def test_monthly_breakdown_excludes_income_from_expenditure():
     repo = TransactionRepository(":memory:")
     repo.insert(_make_transaction(transaction_date=date(2026, 1, 5), amount=-500, category="Groceries"))
     repo.insert(_make_transaction(transaction_date=date(2026, 1, 10), amount=265000, category=INCOME_CATEGORY))
 
-    assert _monthly_expenditure(repo)["2026-01"] == -500
+    expenditure, separate = _monthly_breakdown(repo)
+
+    assert expenditure["2026-01"] == -500
+    assert separate == {}
 
 
-def test_monthly_expenditure_excludes_separate_categories():
+def test_monthly_breakdown_moves_separate_categories_out_of_expenditure():
     repo = TransactionRepository(":memory:")
     repo.insert(_make_transaction(transaction_date=date(2026, 1, 5), amount=-500, category="Groceries"))
     repo.insert(_make_transaction(transaction_date=date(2026, 1, 10), amount=-1190069, category="Stony Brook"))
 
-    assert _monthly_expenditure(repo)["2026-01"] == -500
+    expenditure, separate = _monthly_breakdown(repo)
+
+    assert expenditure["2026-01"] == -500
+    assert separate["2026-01"] == {"Stony Brook": -1190069}
 
 
-def test_monthly_expenditure_includes_regular_categories():
+def test_monthly_breakdown_includes_regular_categories():
     repo = TransactionRepository(":memory:")
     repo.insert(_make_transaction(transaction_date=date(2026, 1, 5), amount=-500, category="Groceries"))
     repo.insert(_make_transaction(transaction_date=date(2026, 1, 10), amount=-300, category="Eat Out"))
 
-    assert _monthly_expenditure(repo)["2026-01"] == -800
+    expenditure, _ = _monthly_breakdown(repo)
+
+    assert expenditure["2026-01"] == -800
+
+
+def test_print_spend_by_month_shows_separate_category_total(capsys):
+    repo = TransactionRepository(":memory:")
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 5), amount=-500, category="Groceries"))
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 10), amount=-1190069, category="Stony Brook"))
+
+    print_spend_by_month(repo)
+
+    out = capsys.readouterr().out
+    assert "-$5.00" in out
+    assert "Stony Brook: -$11900.69" in out
 
 
 def test_print_spend_by_category_still_shows_income_and_separate_categories(capsys):
