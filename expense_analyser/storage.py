@@ -8,9 +8,9 @@ from expense_analyser.models import Transaction
 class TransactionRepository:
     def __init__(self, db_path: str):
         self.connection = sqlite3.connect(db_path)
-        self._create_table()
+        self._create_tables()
 
-    def _create_table(self) -> None:
+    def _create_tables(self) -> None:
         self.connection.execute(
             """
             CREATE TABLE IF NOT EXISTS transactions (
@@ -25,6 +25,14 @@ class TransactionRepository:
                 source_file TEXT NOT NULL,
                 dedup_hash TEXT NOT NULL UNIQUE,
                 ingested_at TEXT NOT NULL
+            )
+            """
+        )
+        self.connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS merchant_rules (
+                normalized_description TEXT PRIMARY KEY,
+                category TEXT NOT NULL
             )
             """
         )
@@ -56,9 +64,41 @@ class TransactionRepository:
         return cursor.rowcount > 0
 
     def fetch_all(self) -> list[Transaction]:
-        cursor = self.connection.execute("SELECT * FROM transactions")
+        return self._fetch("SELECT * FROM transactions")
+
+    def fetch_uncategorized(self) -> list[Transaction]:
+        return self._fetch("SELECT * FROM transactions WHERE category IS NULL")
+
+    def _fetch(self, query: str) -> list[Transaction]:
+        cursor = self.connection.execute(query)
         columns = [col[0] for col in cursor.description]
         return [self._row_to_transaction(dict(zip(columns, row))) for row in cursor.fetchall()]
+
+    def update_category(self, transaction_id: UUID, category: str) -> None:
+        self.connection.execute(
+            "UPDATE transactions SET category = ? WHERE id = ?",
+            (category, str(transaction_id)),
+        )
+        self.connection.commit()
+
+    def get_merchant_rule(self, normalized_description: str) -> str | None:
+        cursor = self.connection.execute(
+            "SELECT category FROM merchant_rules WHERE normalized_description = ?",
+            (normalized_description,),
+        )
+        row = cursor.fetchone()
+        return row[0] if row else None
+
+    def set_merchant_rule(self, normalized_description: str, category: str) -> None:
+        self.connection.execute(
+            """
+            INSERT INTO merchant_rules (normalized_description, category)
+            VALUES (?, ?)
+            ON CONFLICT(normalized_description) DO UPDATE SET category = excluded.category
+            """,
+            (normalized_description, category),
+        )
+        self.connection.commit()
 
     @staticmethod
     def _row_to_transaction(row: dict) -> Transaction:
