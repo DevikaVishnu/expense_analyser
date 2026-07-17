@@ -36,7 +36,7 @@ e.g. `expense_reports/IslandFederal_checking/bank_statement/` and `expense_repor
 - [x] `IslandFederalStatementParser` (official bank statement format)
 - [ ] Parser for IslandFederal checking transaction-history export format
 - [x] Ingestion CLI
-- [ ] Categorization CLI (with merchant-rule auto-suggestion)
+- [x] Categorization CLI (with merchant-rule auto-suggestion)
 - [ ] Spend analysis / reporting
 - [ ] Self-hostable packaging (Docker Compose) + web UI for phone access
 
@@ -62,3 +62,11 @@ By default this reads from `expense_reports/` and writes to `expenses.db` in the
 ```
 python -m expense_analyser.ingest --expense-reports-dir path/to/statements --db-path path/to/expenses.db
 ```
+
+Then categorize whatever's uncategorized, interactively:
+
+```
+python -m expense_analyser.categorization
+```
+
+For each transaction, this shows a suggested category if you've categorized a similar merchant before (press Enter to accept), or a numbered list of categories to pick from — you can also type a category name directly, including a brand new one not already in the list.
