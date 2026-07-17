@@ -69,8 +69,20 @@ class TransactionRepository:
     def fetch_uncategorized(self) -> list[Transaction]:
         return self._fetch("SELECT * FROM transactions WHERE category IS NULL")
 
-    def _fetch(self, query: str) -> list[Transaction]:
-        cursor = self.connection.execute(query)
+    def search_by_description(self, search_term: str) -> list[Transaction]:
+        return self._fetch(
+            "SELECT * FROM transactions WHERE description LIKE ?",
+            (f"%{search_term}%",),
+        )
+
+    def get_all_categories(self) -> list[str]:
+        cursor = self.connection.execute(
+            "SELECT DISTINCT category FROM transactions WHERE category IS NOT NULL ORDER BY category"
+        )
+        return [row[0] for row in cursor.fetchall()]
+
+    def _fetch(self, query: str, params: tuple = ()) -> list[Transaction]:
+        cursor = self.connection.execute(query, params)
         columns = [col[0] for col in cursor.description]
         return [self._row_to_transaction(dict(zip(columns, row))) for row in cursor.fetchall()]
 
@@ -80,6 +92,23 @@ class TransactionRepository:
             (category, str(transaction_id)),
         )
         self.connection.commit()
+
+    def spend_by_category(self) -> list[tuple[str | None, int]]:
+        cursor = self.connection.execute(
+            "SELECT category, SUM(amount) FROM transactions GROUP BY category ORDER BY SUM(amount) ASC"
+        )
+        return cursor.fetchall()
+
+    def spend_by_month(self) -> list[tuple[str, int]]:
+        cursor = self.connection.execute(
+            """
+            SELECT strftime('%Y-%m', transaction_date) AS month, SUM(amount)
+            FROM transactions
+            GROUP BY month
+            ORDER BY month
+            """
+        )
+        return cursor.fetchall()
 
     def get_merchant_rule(self, normalized_description: str) -> str | None:
         cursor = self.connection.execute(

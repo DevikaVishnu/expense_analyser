@@ -17,6 +17,8 @@ PDF statement  --(parser)-->  Transaction  --(repository)-->  SQLite
 - **`expense_analyser/parsers/registry.py`** — `PARSER_REGISTRY`, mapping a folder-path key (e.g. `"IslandFederal_checking/bank_statement"`) to the parser class that understands it. Adding a new source means writing one new parser class and one registry entry — no other code changes.
 - **`expense_analyser/storage.py`** — `TransactionRepository`, a thin wrapper around SQLite. Inserts are idempotent (`INSERT OR IGNORE` + a `UNIQUE` constraint on a content hash), so re-ingesting overlapping statements is safe.
 - **`expense_analyser/ingest.py`** — the ingestion CLI. Walks `expense_reports/`, looks up the right parser per folder via `PARSER_REGISTRY`, and stores the results. Folders with no matching registry entry are skipped with a warning rather than crashing the run.
+- **`expense_analyser/categorization.py`** — the categorization CLI. Genuine deposits and known merchants are auto-labeled without prompting (a merchant rule, once set, applies itself to every future transaction from that merchant — including refunds, which share the original purchase's description); only genuinely new merchants stop and ask. `recategorize()` bulk-fixes an already-categorized merchant by search term if a rule was ever set wrong.
+- **`expense_analyser/reporting.py`** — spend-by-category and spend-by-month reports, printed to the terminal and exported to `reports/` as CSV. Amounts are summed net of refunds within each category/month.
 
 ### Folder convention for statements
 
@@ -37,13 +39,13 @@ e.g. `expense_reports/IslandFederal_checking/bank_statement/` and `expense_repor
 - [ ] Parser for IslandFederal checking transaction-history export format
 - [x] Ingestion CLI
 - [x] Categorization CLI (with merchant-rule auto-suggestion)
-- [ ] Spend analysis / reporting
+- [x] Spend analysis / reporting
 - [ ] Self-hostable packaging (Docker Compose) + web UI for phone access
 
 ## Setup
 
 ```
-python -m venv venv
+python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 pytest
@@ -54,19 +56,31 @@ pytest
 Ingest all statement PDFs under `expense_reports/` into the database:
 
 ```
-python -m expense_analyser.ingest
+python3 -m expense_analyser.ingest
 ```
 
 By default this reads from `expense_reports/` and writes to `expenses.db` in the project root. Both are configurable:
 
 ```
-python -m expense_analyser.ingest --expense-reports-dir path/to/statements --db-path path/to/expenses.db
+python3 -m expense_analyser.ingest --expense-reports-dir path/to/statements --db-path path/to/expenses.db
 ```
 
-Then categorize whatever's uncategorized, interactively:
+Then categorize whatever's uncategorized:
 
 ```
-python -m expense_analyser.categorization
+python3 -m expense_analyser.categorization
 ```
 
-For each transaction, this shows a suggested category if you've categorized a similar merchant before (press Enter to accept), or a numbered list of categories to pick from — you can also type a category name directly, including a brand new one not already in the list.
+Deposits and refunds are handled automatically (see `categorization.py` above); you're only asked about a transaction the first time its merchant shows up — after that, every future transaction from that merchant is auto-applied and just logged, not re-asked. If a merchant rule was ever set wrong, fix every affected transaction at once:
+
+```
+python3 -m expense_analyser.categorization --recategorize "search term"
+```
+
+Finally, generate reports:
+
+```
+python3 -m expense_analyser.reporting
+```
+
+Prints spend-by-category and spend-by-month to the terminal and writes matching CSVs to `reports/` (both `--db-path` and `--reports-dir` are overridable, same pattern as above).

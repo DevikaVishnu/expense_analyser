@@ -4,3 +4,4 @@ expense_reports/
 __pycache__/
 *.pyc
 *.db
+reports/
