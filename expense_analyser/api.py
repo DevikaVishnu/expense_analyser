@@ -20,7 +20,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from expense_analyser.categorization import normalize_description
+from expense_analyser.categorization import INCOME_CATEGORY, SEPARATE_CATEGORIES, normalize_description
 from expense_analyser.models import Transaction
 from expense_analyser.reporting import _apply_category_groups, _monthly_breakdown
 from expense_analyser.storage import TransactionRepository
@@ -63,9 +63,18 @@ def list_months(repo: TransactionRepository = Depends(get_repo)) -> list[MonthSu
 def list_month_categories(
     month: str, repo: TransactionRepository = Depends(get_repo)
 ) -> list[CategoryTotal]:
+    # This endpoint's only consumer is the spend-by-category chart, so
+    # unlike the CLI reports (which deliberately show everything for
+    # review), it excludes INCOME_CATEGORY (not spend) and
+    # SEPARATE_CATEGORIES (real spend, but large/irregular enough that
+    # one bar dwarfs every other category and makes the chart useless).
+    # Both stay fully visible elsewhere — the hero figure, the CLI
+    # reports, and review_category.
+    excluded = {INCOME_CATEGORY, *SEPARATE_CATEGORIES}
     return [
         CategoryTotal(category=category or "Uncategorized", total=total)
         for category, total in _apply_category_groups(repo.spend_by_category_for_month(month))
+        if category not in excluded
     ]
 
 

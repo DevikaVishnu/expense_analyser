@@ -5,6 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from expense_analyser.api import app, get_repo
+from expense_analyser.categorization import INCOME_CATEGORY
 from expense_analyser.models import Transaction
 from expense_analyser.storage import TransactionRepository
 
@@ -76,6 +77,28 @@ def test_list_month_categories_rolls_up_train_group():
 
     assert response.status_code == 200
     assert response.json() == [{"category": "Train", "total": -800}]
+
+
+def test_list_month_categories_excludes_income():
+    repo = TransactionRepository(":memory:")
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 5), amount=-500, category="Groceries"))
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 10), amount=265000, category=INCOME_CATEGORY))
+
+    response = _client_with_repo(repo).get("/api/months/2026-01/categories")
+
+    assert response.status_code == 200
+    assert response.json() == [{"category": "Groceries", "total": -500}]
+
+
+def test_list_month_categories_excludes_separate_categories():
+    repo = TransactionRepository(":memory:")
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 5), amount=-500, category="Groceries"))
+    repo.insert(_make_transaction(transaction_date=date(2026, 1, 10), amount=-1190069, category="Stony Brook"))
+
+    response = _client_with_repo(repo).get("/api/months/2026-01/categories")
+
+    assert response.status_code == 200
+    assert response.json() == [{"category": "Groceries", "total": -500}]
 
 
 def test_list_month_transactions_returns_only_that_months_transactions():

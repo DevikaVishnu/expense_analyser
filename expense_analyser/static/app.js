@@ -309,10 +309,10 @@ async function selectMonth(month) {
     fetchJSON(`/api/months/${month}/categories`),
     fetchJSON(`/api/months/${month}/transactions`),
   ]);
-  // Income isn't spend, so it doesn't belong on a spend-by-category chart —
-  // it's still visible in the hero figure and the transaction table below.
-  const spendCategories = categories.filter((c) => c.category !== "Income");
-  renderCategoryChart(document.getElementById("category-chart"), spendCategories);
+  // The API already excludes Income and SEPARATE_CATEGORIES (e.g.
+  // Stony Brook) from this endpoint — both stay visible in the hero
+  // figure above, just not on a chart they'd otherwise dominate.
+  renderCategoryChart(document.getElementById("category-chart"), categories);
   renderTransactionTable(document.getElementById("transaction-table"), transactions);
 }
 
