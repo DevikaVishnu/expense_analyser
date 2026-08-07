@@ -1,9 +1,4 @@
-"""Spend reports derived from categorized transactions.
-
-Prints spend-by-category and spend-by-month summaries to the terminal,
-and writes the same data out as CSV files for anyone who wants to
-pivot on it in a spreadsheet.
-"""
+"""Spend-by-category / spend-by-month reports, printed and exported to CSV."""
 
 import argparse
 import csv
@@ -18,17 +13,10 @@ DEFAULT_REPORTS_DIR = "reports"
 
 
 def _monthly_breakdown(repo: TransactionRepository) -> tuple[dict[str, int], dict[str, dict[str, int]]]:
-    """Splits each month's transactions into routine expenditure vs.
-    SEPARATE_CATEGORIES totals. INCOME_CATEGORY is dropped from both —
-    it isn't spending at all, so it belongs in neither bucket.
-
-    Returns (expenditure_by_month, separate_by_month):
-    - expenditure_by_month: month -> total, routine spend only.
-    - separate_by_month: month -> {category: total}, one entry per
-      SEPARATE_CATEGORIES category with transactions that month — the
-      exact amounts left out of the expenditure figure, so they stay
-      visible as their own value instead of being merged in or hidden.
-    """
+    """Returns (expenditure_by_month, separate_by_month) — routine
+    spend vs SEPARATE_CATEGORIES totals, each month -> total (or
+    month -> {category: total} for separate). Income dropped from
+    both, it isn't spending."""
     separate_categories = set(SEPARATE_CATEGORIES)
     expenditure: dict[str, int] = {}
     separate: dict[str, dict[str, int]] = {}
@@ -52,13 +40,8 @@ def _format_separate_totals(separate_for_month: dict[str, int] | None) -> str:
 
 
 def _apply_category_groups(rows: list[tuple[str | None, int]]) -> list[tuple[str | None, int]]:
-    """Collapses rows whose category belongs to a CATEGORY_GROUPS group
-    (see categorization.py) into one combined row under the group's
-    name — e.g. Subway + Amtrak + LIRR become one "Train" row, summed.
-    Transactions keep their real, granular category in storage; this
-    only affects how category breakdowns are displayed. Uncategorized
-    (None) and ungrouped categories pass through unchanged.
-    """
+    """Collapses group members (Subway + Amtrak + LIRR) into one summed
+    "Train" row for display — storage keeps the real category."""
     grouped: dict[str | None, int] = {}
     for category, total in rows:
         display_category = _group_for_category(category) if category is not None else category
@@ -103,9 +86,8 @@ def write_csv(rows: list[tuple], headers: list[str], path: Path) -> None:
         writer = csv.writer(f)
         writer.writerow(headers)
         for label, total_cents in rows:
-            # Cents -> dollars only for this final text export, formatted
-            # as a fixed 2-decimal string rather than a raw float, so no
-            # binary floating-point noise ends up in the CSV.
+            # Fixed 2-decimal string, not a raw float — no binary
+            # floating-point noise in the CSV.
             writer.writerow([label or "Uncategorized", f"{total_cents / 100:.2f}"])
 
 

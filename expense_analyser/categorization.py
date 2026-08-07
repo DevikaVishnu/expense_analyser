@@ -1,10 +1,7 @@
-"""Interactive categorization of parsed transactions.
+"""Interactive categorization CLI.
 
-Transactions land in the database with category=None after ingestion.
-This module walks a user through the uncategorized ones from the
-command line, assigning a category to each — and remembers each choice
-as a "merchant rule" so the same merchant doesn't need to be manually
-categorized every single time it shows up in a future statement.
+Walks through uncategorized transactions and remembers each merchant
+choice as a rule, so the same merchant isn't asked about twice.
 """
 
 import argparse
@@ -15,18 +12,14 @@ from expense_analyser.storage import TransactionRepository
 
 DEFAULT_DB_PATH = "expenses.db"
 
-# Auto-assigned to credits (deposits, refunds, incoming transfers) without
-# prompting — there's nothing meaningful to ask about a deposit from an
-# expense category list. Kept separate from CATEGORIES since it's never
-# something the user picks interactively.
+# Auto-assigned to credits, never prompted for — doesn't belong in the
+# interactive CATEGORIES list.
 INCOME_CATEGORY = "Income"
 
-# A credit (amount >= 0) is auto-labeled INCOME_CATEGORY if its
-# description contains any of these markers; otherwise it falls
-# through to the normal prompt (which is how refunds — no marker,
-# same description as the original purchase — get routed to the
-# original purchase's category instead of being miscounted as income).
-# Extend this list as new genuine-income statement formats show up.
+# Credits matching one of these get auto-labeled Income. Anything else
+# falls through to the normal prompt — that's how refunds (no marker,
+# same description as the original purchase) end up back in the right
+# category instead of counted as income.
 INCOME_MARKERS = ["DEPOSIT", "CHECK DEP"]
 
 CATEGORIES = [
@@ -38,44 +31,31 @@ CATEGORIES = [
     "Miscellaneous",
 ]
 
-# Categories that get combined into one rollup row wherever spend is
-# broken out by category — a display concept only. Transactions keep
-# their real, granular category (e.g. "Subway") for tracking; reports
-# additionally show the group's combined total under the group name.
-# "Train" was removed from CATEGORIES above once it became a group
-# name, so it can't also be picked as a literal category and collide
-# with the rollup.
+# Display-only rollup — transactions keep their real category (Subway,
+# Amtrak...), reports show the group total too. "Train" isn't in
+# CATEGORIES anymore since it's a group name now, not a pickable one.
 CATEGORY_GROUPS = {
     "Train": ["Subway", "Amtrak", "LIRR"],
 }
 
 
 def _group_for_category(category: str) -> str:
-    """The display name for category — its group's name if it belongs
-    to one, otherwise the category itself unchanged."""
+    """Group name if category belongs to one, else category unchanged."""
     for group, members in CATEGORY_GROUPS.items():
         if category in members:
             return group
     return category
 
-# Categories excluded from "total expenditure" figures even though some
-# represent real spending (Stony Brook does) — large, infrequent payments
-# that would distort what a normal period's spending looks like if netted
-# into the same total as day-to-day expenses. Still shown as their own
-# line wherever categories are broken out, just not folded into a
-# headline expenditure number. Extend as needed.
+# Real spend, but excluded from the headline expenditure total — large
+# one-off payments (tuition) that'd swamp normal month-to-month
+# comparisons. Still shown as their own line elsewhere.
 SEPARATE_CATEGORIES = ["Stony Brook"]
 
 
 def _known_categories(repo: TransactionRepository) -> list[str]:
-    """The fixed CATEGORIES list, extended with any category that has
-    ever actually been assigned to a transaction (e.g. a free-text
-    category typed in a previous run). INCOME_CATEGORY is excluded —
-    it's auto-assigned only, never something to pick manually.
-
-    Merging is case-insensitive, so a category already present as
-    "Shopping" won't also show up as a second, separate "shopping".
-    """
+    """CATEGORIES plus any free-text category actually in use, minus
+    Income. Case-insensitive merge so "shopping" doesn't duplicate
+    "Shopping"."""
     known = list(CATEGORIES)
     for category in repo.get_all_categories():
         if category == INCOME_CATEGORY:
@@ -86,22 +66,11 @@ def _known_categories(repo: TransactionRepository) -> list[str]:
 
 
 def _resolve_category(response: str, known_categories: list[str]) -> str:
-    """Match a typed category against known_categories case-insensitively.
-
-    If response matches an existing category except for case, reuse
-    that existing entry's exact spelling/casing rather than creating a
-    second, differently-cased category — whoever types a category
-    first effectively sets its canonical casing. Returns response
-    unchanged if nothing matches, which then becomes the canonical
-    form for anyone who reuses it later.
-
-    INCOME_CATEGORY is checked explicitly even though it's excluded
-    from known_categories (so it never shows up as a numbered option)
-    — otherwise typing "income" manually for a credit that the
-    auto-detection missed (e.g. a check deposit, which doesn't say
-    "DEPOSIT") would create a separate "income" category instead of
-    joining the auto-labeled "Income" bucket.
-    """
+    """Match response against known_categories case-insensitively,
+    reusing the existing casing if found. Falls through to Income even
+    though it's not in known_categories, so a manually-typed "income"
+    (e.g. for a check deposit the auto-detect missed) still joins the
+    same bucket instead of forking a new category."""
     if response.lower() == INCOME_CATEGORY.lower():
         return INCOME_CATEGORY
     for existing in known_categories:
@@ -111,48 +80,22 @@ def _resolve_category(response: str, known_categories: list[str]) -> str:
 
 
 def normalize_description(description: str) -> str:
-    """Reduce a raw transaction description to a stable merchant key.
-
-    Uses the first two whitespace-separated tokens, uppercased. Two
-    tokens rather than one: several merchants share a single-word
-    payment-processor prefix (e.g. "TST*MAGNOLIA BAK" and "TST*THAI
-    TANIUM" both start with "TST*"), so a one-token key would
-    incorrectly treat different merchants as the same one.
-    """
+    """First two tokens, uppercased, as a merchant key. Two tokens
+    because processor prefixes like "TST*" collide on the first
+    token alone."""
     tokens = description.upper().split()
     return " ".join(tokens[:2])
 
 
 def categorize_interactively(repo: TransactionRepository) -> None:
-    """Prompt the user to categorize every genuinely new uncategorized expense.
+    """Prompt for every genuinely new uncategorized expense.
 
-    Three kinds of transactions never require a prompt:
-
-    1. Genuine income (amount >= 0 AND the description contains one of
-       INCOME_MARKERS) is auto-labeled INCOME_CATEGORY.
-    2. Anything whose merchant key already has a saved rule from a
-       previous categorization is auto-applied that rule directly —
-       once you've told the system WEEE is Groceries, it applies that
-       to every WEEE transaction without asking again. Printed as an
-       FYI line, not a prompt, so you still see what happened.
-    3. Refunds fall under (2) automatically: a refund's description
-       looks identical to the original purchase's (e.g. a "DEBIT CARD
-       CREDIT" refund carries the same description as a normal
-       purchase from that merchant — the word "credit" never survives
-       into the stored description), so it shares the same merchant
-       key and picks up the same rule, keeping per-category totals
-       netted correctly rather than miscounted as unrelated income.
-
-    Only a transaction whose merchant key has *no* existing rule yet
-    actually stops and asks — show the known category list, accept a
-    number, a freely typed category name, or 'skip' to leave it
-    uncategorized for now. Every real answer saves both the
-    transaction's category and a new merchant rule for that key, so
-    the *next* transaction from that merchant no longer needs to ask.
-
-    If a rule later turns out to be wrong, use recategorize() to fix
-    every affected transaction at once rather than reviewing them
-    individually here.
+    Income and known merchants (rule already saved) get auto-labeled
+    without asking — refunds ride along here too since they share a
+    description with the original purchase. Only a truly new merchant
+    stops and asks; the answer saves a merchant rule so it isn't asked
+    again. Use recategorize() to fix a rule that was wrong, instead of
+    reviewing transactions one by one here.
     """
     uncategorized = repo.fetch_uncategorized()
 
@@ -194,18 +137,14 @@ def categorize_interactively(repo: TransactionRepository) -> None:
             print("Skipped — will remain uncategorized.")
             continue
         elif response.isdigit() and 1 <= int(response) <= len(known_categories):
-            # A number selects from the known-categories list.
             category = known_categories[int(response) - 1]
         elif response:
-            # Reuse an existing category's casing if this matches one
-            # case-insensitively; otherwise it's genuinely new — either
-            # way, remember it so it's numbered for the rest of this run.
+            # Match existing casing if this is a dupe, else it's new —
+            # remember it either way so it's numbered going forward.
             category = _resolve_category(response, known_categories)
             if category not in known_categories:
                 known_categories.append(category)
         else:
-            # Blank response with nothing to default to: leave this
-            # transaction uncategorized rather than forcing a choice.
             print("No category entered, skipping.")
             continue
 
@@ -222,15 +161,9 @@ def categorize_interactively(repo: TransactionRepository) -> None:
 
 
 def recategorize(repo: TransactionRepository, search_term: str) -> None:
-    """Bulk-reassign the category of every transaction whose description
-    contains search_term (case-insensitive substring match), including
-    ones that already have a category — unlike categorize_interactively,
-    which only ever looks at uncategorized transactions.
-
-    Also refreshes the merchant rule for each matched transaction's own
-    normalized key, so future transactions from the same merchant(s)
-    get suggested the corrected category too.
-    """
+    """Bulk-reassign every transaction matching search_term (substring,
+    case-insensitive), categorized or not, and refresh the merchant
+    rule so future transactions get the fix too."""
     matches = repo.search_by_description(search_term)
 
     if not matches:
@@ -270,28 +203,18 @@ def _review_transactions(
     exclude_from_total: set[str] | None = None,
     separate_totals_for: set[str] | None = None,
 ) -> None:
-    """Show a running total + numbered list for transactions, then let
-    the user selectively change any of their categories by number —
-    as many times as needed, not a forced one-by-one pass through
-    every transaction. Shared by review_month and review_category,
-    which differ only in how transactions was sliced.
+    """Print a running total + numbered list, then let the user fix
+    categories by number until they hit Enter. Shared by review_month
+    and review_category.
 
-    category_filter, when set, means this list is "everything
-    currently in category X" (review_category's case) — if a change
-    moves a transaction to a *different* category, it no longer
-    belongs here, so it's dropped from the list and the total is
-    recomputed, rather than just having its label updated in place
-    (which is what happens for review_month, where category_filter is
-    None since the transaction's month never changes).
+    category_filter (review_category's case) drops a transaction from
+    the list once it's moved elsewhere, since it no longer belongs;
+    review_month just relabels in place since the month never changes.
 
-    exclude_from_total categories are dropped from the printed total
-    entirely and not called out separately (e.g. INCOME_CATEGORY —
-    not spending at all). separate_totals_for categories are also
-    excluded from the total, but each gets its own value printed
-    alongside it (e.g. SEPARATE_CATEGORIES like Stony Brook — real
-    spending, just tracked apart from routine expenditure). Both
-    leave the transactions in the displayed list either way — nothing
-    is hidden from review, only from the headline number.
+    exclude_from_total (e.g. Income) drops out of the total silently;
+    separate_totals_for (e.g. Stony Brook) drops out too but gets its
+    own printed value. Nothing disappears from the list either way —
+    only from the headline number.
     """
     if not transactions:
         print(f"No transactions found for {label}.")
@@ -349,11 +272,8 @@ def _review_transactions(
         repo.set_merchant_rule(normalize_description(txn.description), new_category)
 
         if category_filter is not None:
-            # Compare via _group_for_category so a group-name filter
-            # (e.g. reviewing "Train") keeps a transaction that moved
-            # between group members (Subway -> Amtrak is still Train)
-            # — for a plain category filter this is a no-op, since
-            # _group_for_category returns ungrouped categories unchanged.
+            # _group_for_category so moving Subway -> Amtrak still
+            # counts as "still Train" when reviewing the group.
             still_belongs = _group_for_category(new_category).lower() == category_filter.lower()
         else:
             still_belongs = True
@@ -374,12 +294,9 @@ def _review_transactions(
 
 def review_month(repo: TransactionRepository, month: str) -> None:
     """Show the total expenditure and every individual transaction for
-    month (format "YYYY-MM"), then let the user selectively fix any of
-    their categories. The total excludes INCOME_CATEGORY entirely and
-    calls out SEPARATE_CATEGORIES (e.g. Stony Brook) as their own
-    separate value — same definition as the reports (see
-    reporting.py) — though those transactions still show up in the
-    list itself, so nothing is hidden from review.
+    month ("YYYY-MM"), same expenditure definition as the reports —
+    Income excluded, Stony Brook called out separately but still
+    visible in the list.
     """
     _review_transactions(
         repo,
@@ -391,18 +308,10 @@ def review_month(repo: TransactionRepository, month: str) -> None:
 
 
 def review_category(repo: TransactionRepository, category: str) -> None:
-    """Show every transaction currently assigned to category, along
-    with its running total, and let the user move any outliers to a
-    different category — the tool for "this category's total looks
-    wrong in the report, what's actually in it?" A transaction moved
-    elsewhere is removed from this list, so the total shown always
-    reflects what's left still assigned to category.
-
-    If category is a CATEGORY_GROUPS group name (e.g. "Train"), this
-    shows the combined transactions of every member category (Subway
-    + Amtrak + LIRR) — no transaction is ever literally stored with
-    the group's name, so a plain fetch_by_category("Train") would
-    always come back empty.
+    """Everything currently in category + running total — for tracking
+    down why a category's report total looks wrong. Group names (e.g.
+    "Train") pull in every member category's transactions, since
+    nothing's ever literally stored as "Train".
     """
     if category in CATEGORY_GROUPS:
         transactions = [
