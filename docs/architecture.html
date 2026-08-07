@@ -8,16 +8,17 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg: #fbfaf8;
+    --bg: #ffffff;
     --text1: #1a1916;
     --text2: #5c5a55;
-
-    --tan-bg: #f2ede0; --tan-border: #d9cfb0; --tan-text: #6b5a2e;
-    --teal-bg: #e0f5ec; --teal-border: #a8d9c2; --teal-text: #146b4a;
-    --purple-bg: #ece7f9; --purple-border: #c9bdec; --purple-text: #4a2f8a;
-    --blue-bg: #e6f0fb; --blue-border: #b3d1f0; --blue-text: #1a4a8a;
-    --amber-bg: #faf0e0; --amber-border: #e8cfa0; --amber-text: #8a5a1a;
     --arrow: #9c9a94;
+
+    --tan-bg: #f2ede0; --tan-border: #c9ab52; --tan-text: #6b5a2e;
+    --teal-bg: #e0f5ec; --teal-border: #2f9e6e; --teal-text: #146b4a;
+    --purple-bg: #ece7f9; --purple-border: #8a6fd8; --purple-text: #4a2f8a;
+    --blue-bg: #e6f0fb; --blue-border: #4a86d8; --blue-text: #1a4a8a;
+    --amber-bg: #faf0e0; --amber-border: #d89a3a; --amber-text: #8a5a1a;
+    --sub-bg: rgba(255,255,255,0.6); --sub-border: #8a6fd8;
   }
 
   @media (prefers-color-scheme: dark) {
@@ -25,52 +26,31 @@
       --bg: #14130f;
       --text1: #edecea;
       --text2: #9c9a94;
+      --arrow: #6c6a64;
 
-      --tan-bg: #2a2418; --tan-border: #4a4128; --tan-text: #d9c98a;
-      --teal-bg: #0f2318; --teal-border: #1e5c3c; --teal-text: #6bd9a8;
-      --purple-bg: #1e1835; --purple-border: #3d2f6b; --purple-text: #b3a0f0;
-      --blue-bg: #0f1d35; --blue-border: #1e3f6b; --blue-text: #8fbef0;
-      --amber-bg: #2a1e0a; --amber-border: #5c4218; --amber-text: #e8b46b;
-      --arrow: #5c5a55;
+      --tan-bg: #2a2418; --tan-border: #a08838; --tan-text: #e0cf8a;
+      --teal-bg: #0f2318; --teal-border: #2f9e6e; --teal-text: #7bdcae;
+      --purple-bg: #1e1835; --purple-border: #8a6fd8; --purple-text: #c2b0f5;
+      --blue-bg: #0f1d35; --blue-border: #4a86d8; --blue-text: #9dc4f5;
+      --amber-bg: #2a1e0a; --amber-border: #d89a3a; --amber-text: #f0be7a;
+      --sub-bg: rgba(0,0,0,0.3); --sub-border: #8a6fd8;
     }
   }
 
   html { background: var(--bg); }
   body {
-    max-width: 780px; margin: 0 auto; padding: 40px 20px 64px;
+    max-width: 1040px; margin: 0 auto; padding: 36px 24px 60px;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     color: var(--text1);
   }
-
-  header { margin-bottom: 36px; }
+  header { margin-bottom: 20px; }
   h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.3px; }
-  .sub { font-size: 13px; color: var(--text2); margin-top: 6px; line-height: 1.6; }
-
-  .row { display: flex; gap: 10px; }
-  .arrow-v { display: flex; flex-direction: column; align-items: center; padding: 6px 0; color: var(--arrow); }
-  .arrow-v .glyph { font-size: 16px; line-height: 1; }
-  .arrow-v .label { font-size: 10.5px; font-family: ui-monospace, monospace; margin-top: 2px; text-align: center; }
-
-  a.node { display: block; flex: 1; text-decoration: none; border-radius: 10px; border: 1px solid; padding: 14px 16px; transition: filter 0.15s, transform 0.1s; }
-  a.node:hover { filter: brightness(0.97); transform: translateY(-1px); }
-  @media (prefers-color-scheme: dark) { a.node:hover { filter: brightness(1.15); } }
-  .node-title { font-size: 14.5px; font-weight: 700; }
-  .node-sub { font-size: 11.5px; margin-top: 3px; opacity: 0.85; }
-
-  .tan { background: var(--tan-bg); border-color: var(--tan-border); color: var(--tan-text); }
-  .teal { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal-text); }
-  .purple { background: var(--purple-bg); border-color: var(--purple-border); color: var(--purple-text); }
-  .blue { background: var(--blue-bg); border-color: var(--blue-border); color: var(--blue-text); }
-  .amber { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber-text); }
-
-  .sub-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
-  .sub-box { background: rgba(255,255,255,0.5); border: 1px solid currentColor; border-radius: 6px; padding: 6px 9px; font-size: 11px; font-family: ui-monospace, monospace; opacity: 0.9; }
-  @media (prefers-color-scheme: dark) { .sub-box { background: rgba(0,0,0,0.25); } }
-
-  .side-row { display: flex; align-items: stretch; gap: 10px; }
-  .side-arrow { display: flex; align-items: center; justify-content: center; width: 30px; flex-shrink: 0; color: var(--arrow); font-size: 13px; text-align: center; }
-
-  footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--tan-border); font-size: 12px; color: var(--text2); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .sub { font-size: 13.5px; color: var(--text2); margin-top: 6px; line-height: 1.6; }
+  svg text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  svg a { cursor: pointer; }
+  svg a:hover rect.node-box { filter: brightness(0.96); }
+  @media (prefers-color-scheme: dark) { svg a:hover rect.node-box { filter: brightness(1.25); } }
+  footer { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--arrow); font-size: 12px; color: var(--text2); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
   footer a { color: var(--text2); }
 </style>
 </head>
@@ -78,65 +58,139 @@
 
 <header>
   <h1>expense_analyser — architecture</h1>
-  <p class="sub">Click any box to open its source file on GitHub. PDF statements → SQLite → FastAPI → web dashboard, with two CLI tools reading/writing the same database.</p>
+  <p class="sub">Click any box to open its source file on GitHub. PDF statements and the CLI tools both write into SQLite; FastAPI reads/writes it and serves the dashboard.</p>
 </header>
 
-<div class="row">
-  <a class="node tan" href="https://github.com/DevikaVishnu/expense_analyser/blob/main/expense_analyser/ingest.py">
-    <div class="node-title">PDF statements</div>
-    <div class="node-sub">Bank / credit card exports → ingest.py</div>
-  </a>
-  <a class="node tan" href="https://github.com/DevikaVishnu/expense_analyser/blob/main/expense_analyser/categorization.py">
-    <div class="node-title">Categorization &amp; Reporting CLIs</div>
-    <div class="node-sub">Merchant rules, labels · CSV exports</div>
-  </a>
-</div>
-
-<div class="arrow-v"><span class="glyph">↓</span><span class="label">parser registry · merchant rules</span></div>
-
-<div class="row">
-  <a class="node teal" href="https://github.com/DevikaVishnu/expense_analyser/blob/main/expense_analyser/storage.py">
-    <div class="node-title">SQLite database</div>
-    <div class="node-sub">TransactionRepository · idempotent inserts</div>
-  </a>
-</div>
-
-<div class="arrow-v"><span class="glyph">↓</span><span class="label">uvicorn serves this</span></div>
-
-<div class="side-row">
-  <a class="node purple" href="https://github.com/DevikaVishnu/expense_analyser/blob/main/expense_analyser/api.py" style="flex: 2.4">
-    <div class="node-title">FastAPI — api.py</div>
-    <div class="sub-grid">
-      <div class="sub-box">GET /api/months</div>
-      <div class="sub-box">GET /api/categories</div>
-      <div class="sub-box">GET …/categories</div>
-      <div class="sub-box">GET …/categories/{group}</div>
-      <div class="sub-box">GET …/transactions</div>
-      <div class="sub-box">PATCH …/{id} — live</div>
-    </div>
-  </a>
-  <div class="side-arrow">↔<br>/docs</div>
-  <a class="node amber" href="http://127.0.0.1:8000/docs" style="flex: 1; align-self: center;">
-    <div class="node-title">Auto docs</div>
-    <div class="node-sub">Free interactive API explorer</div>
-  </a>
-</div>
-
-<div class="arrow-v"><span class="glyph">↕</span><span class="label">GET json (cents) · PATCH category, live</span></div>
-
-<div class="row">
-  <a class="node blue" href="https://github.com/DevikaVishnu/expense_analyser/blob/main/expense_analyser/static/app.js">
-    <div class="node-title">Web dashboard</div>
-    <div class="node-sub">static/ — KPI tiles, category list, live category reassignment. No framework, no build step.</div>
-  </a>
-</div>
+<svg viewBox="0 0 1000 900" style="width: 100%; height: auto;" id="diagram"></svg>
 
 <footer>
   <span>expense_analyser · self-hosted personal finance</span>
-  <div>
-    <a href="../README.md">← README</a>
-  </div>
+  <div><a href="../README.md">← README</a></div>
 </footer>
+
+<script>
+const NS = "http://www.w3.org/2000/svg";
+function el(tag, attrs = {}, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+const svg = document.getElementById("diagram");
+
+// Arrowhead marker
+const defs = el("defs", {}, svg);
+const marker = el("marker", {
+  id: "arrow", viewBox: "0 0 10 10", refX: "8", refY: "5",
+  markerWidth: "7", markerHeight: "7", orient: "auto-start-reverse",
+}, defs);
+el("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: "var(--arrow)" }, marker);
+
+function connector(pathData) {
+  el("path", { d: pathData, fill: "none", stroke: "var(--arrow)", "stroke-width": 2, "marker-end": "url(#arrow)" }, svg);
+}
+
+function label(x, y, text, anchor = "middle") {
+  const t = el("text", { x, y, "text-anchor": anchor, "font-size": 12.5, fill: "var(--text2)", "font-family": "ui-monospace, monospace" }, svg);
+  t.textContent = text;
+  return t;
+}
+
+function node({ x, y, w, h, color, title, sub, href, titleSize = 17 }) {
+  const a = el("a", { href }, svg);
+  const g = el("g", {}, a);
+  el("rect", {
+    class: "node-box", x, y, width: w, height: h, rx: 12,
+    fill: `var(--${color}-bg)`, stroke: `var(--${color}-border)`, "stroke-width": 1.6,
+  }, g);
+  const t1 = el("text", { x: x + 20, y: y + 32, "font-size": titleSize, "font-weight": 700, fill: `var(--${color}-text)` }, g);
+  t1.textContent = title;
+  sub.forEach((line, i) => {
+    const t2 = el("text", { x: x + 20, y: y + 54 + i * 18, "font-size": 12.5, fill: `var(--${color}-text)`, opacity: 0.85 }, g);
+    t2.textContent = line;
+  });
+  return { x, y, w, h, cx: x + w / 2, cy: y + h / 2 };
+}
+
+function subBox(x, y, w, h, text) {
+  el("rect", { x, y, width: w, height: h, rx: 5, fill: "var(--sub-bg)", stroke: "var(--sub-border)", "stroke-width": 1 }, svg);
+  const t = el("text", { x: x + 10, y: y + h / 2 + 4, "font-size": 12.5, fill: "var(--purple-text)", "font-family": "ui-monospace, monospace" }, svg);
+  t.textContent = text;
+}
+
+// ---- Layout ----
+const pdf = node({
+  x: 40, y: 40, w: 300, h: 100, color: "tan",
+  title: "PDF statements", sub: ["Bank / credit card exports", "→ ingest.py"],
+  href: "https://github.com/DevikaVishnu/expense_analyser/blob/main/expense_analyser/ingest.py",
+});
+
+const cli = node({
+  x: 380, y: 40, w: 300, h: 100, color: "tan",
+  title: "Categorization & Reporting", sub: ["Merchant rules, labels", "CSV exports"],
+  href: "https://github.com/DevikaVishnu/expense_analyser/blob/main/expense_analyser/categorization.py",
+});
+
+const store = node({
+  x: 160, y: 220, w: 400, h: 100, color: "teal", titleSize: 19,
+  title: "SQLite database", sub: ["TransactionRepository", "Idempotent inserts via INSERT OR IGNORE"],
+  href: "https://github.com/DevikaVishnu/expense_analyser/blob/main/expense_analyser/storage.py",
+});
+
+const api = node({
+  x: 100, y: 420, w: 520, h: 260, color: "purple", titleSize: 20,
+  title: "FastAPI — api.py", sub: [],
+  href: "https://github.com/DevikaVishnu/expense_analyser/blob/main/expense_analyser/api.py",
+});
+const eps = [
+  "GET /api/months", "GET /api/categories",
+  "GET .../categories", "GET .../categories/{group}",
+  "GET .../transactions", "PATCH .../{id} — live",
+];
+const epW = 232, epH = 42, epGapX = 16, epGapY = 12;
+eps.forEach((e, i) => {
+  const col = i % 2, row = Math.floor(i / 2);
+  subBox(api.x + 20 + col * (epW + epGapX), api.y + 60 + row * (epH + epGapY), epW, epH, e);
+});
+
+const docs = node({
+  x: 680, y: 480, w: 220, h: 110, color: "amber",
+  title: "Auto docs", sub: ["localhost:8000/docs", "Free interactive API explorer"],
+  href: "http://127.0.0.1:8000/docs",
+});
+
+const ui = node({
+  x: 100, y: 740, w: 520, h: 110, color: "blue", titleSize: 19,
+  title: "Web dashboard", sub: ["static/ — KPI tiles, category list,", "live category reassignment. No build step."],
+  href: "https://github.com/DevikaVishnu/expense_analyser/blob/main/expense_analyser/static/app.js",
+});
+
+// ---- Connectors ----
+const pdfEntryX = 260;
+connector(`M ${pdf.cx} ${pdf.y + pdf.h} L ${pdf.cx} 190 L ${pdfEntryX} 190 L ${pdfEntryX} ${store.y}`);
+connector(`M ${cli.cx} ${cli.y + cli.h} L ${cli.cx} ${store.y}`);
+label(pdf.cx + 10, 183, "parser registry", "start");
+
+connector(`M ${store.cx} ${store.y + store.h} L ${store.cx} ${api.y}`);
+label(store.cx, store.y + store.h + 22, "uvicorn serves this");
+
+connector(`M ${docs.x} ${docs.cy} L ${api.x + api.w} ${api.y + 55}`);
+label((docs.x + api.x + api.w) / 2 + 10, (docs.cy + api.y + 55) / 2 - 8, "/docs");
+
+connector(`M ${api.cx} ${api.y + api.h} L ${api.cx} ${ui.y}`);
+label(api.cx + 90, api.y + api.h + 22, "GET json (cents)");
+
+// Return path for PATCH, routed down the left margin
+const returnX = 60;
+connector(`M ${ui.x} ${ui.cy} L ${returnX} ${ui.cy} L ${returnX} ${api.y + api.h - 40} L ${api.x} ${api.y + api.h - 40}`);
+label(returnX - 8, (ui.cy + api.y + api.h) / 2, "PATCH", "end");
+label(returnX - 8, (ui.cy + api.y + api.h) / 2 + 16, "live", "end");
+
+// Fit viewBox to content
+const pad = 30;
+svg.setAttribute("viewBox", `0 ${0} 960 ${ui.y + ui.h + pad}`);
+</script>
 
 </body>
 </html>
