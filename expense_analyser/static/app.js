@@ -12,8 +12,7 @@ function formatMoney(cents) {
   return `${sign}$${(Math.abs(cents) / 100).toFixed(2)}`;
 }
 
-// "2026-01" -> "Jan '26". Abbreviated + year (not just "Jan") since the
-// data can span a year boundary, where a bare month name is ambiguous.
+// "2026-01" -> "Jan '26" (year included since data can span a year boundary)
 function formatMonthLabel(monthStr) {
   const [year, month] = monthStr.split("-");
   const monthIndex = parseInt(month, 10) - 1;
@@ -75,12 +74,9 @@ function hideTooltip() {
   if (tooltipEl) tooltipEl.classList.remove("visible");
 }
 
-// Both charts below plot magnitude (Math.abs of the underlying signed
-// cents) rather than the true signed value — "how much did I spend"
-// reads as a positive quantity, even though negative = spend
-// internally. That also means every bar grows the same direction from
-// a single baseline (no zero-crossing), so there's one rounded edge
-// per chart rather than a sign-dependent one.
+// Both charts plot Math.abs(cents) — spend is stored as negative but
+// should just read as a positive amount. One baseline, one rounded
+// edge per bar (no zero-crossing to worry about).
 
 function renderMonthChart(container, months, onSelect, selectedMonth) {
   container.textContent = "";
@@ -150,20 +146,16 @@ function renderMonthChart(container, months, onSelect, selectedMonth) {
     });
     monthLabel.textContent = formatMonthLabel(m.month);
     svg.appendChild(monthLabel);
-  });
 
-  // Direct label only on the most recent month — selective, not one per bar.
-  const last = months[months.length - 1];
-  const lastMagnitude = Math.abs(last.expenditure);
-  const lastX = padding.left + (months.length - 1) * bandWidth + bandWidth / 2;
-  const lastLabel = el("text", {
-    x: lastX,
-    y: scaleY(lastMagnitude) - 8,
-    "text-anchor": "middle",
-    class: "value-label",
+    const valueLabel = el("text", {
+      x: bandX + bandWidth / 2,
+      y: barTopY - 8,
+      "text-anchor": "middle",
+      class: "value-label",
+    });
+    valueLabel.textContent = formatMoney(magnitude);
+    svg.appendChild(valueLabel);
   });
-  lastLabel.textContent = formatMoney(lastMagnitude);
-  svg.appendChild(lastLabel);
 
   container.appendChild(svg);
 }
@@ -196,7 +188,6 @@ function renderCategoryChart(container, categories, onBarClick) {
     el("line", { x1: padding.left, x2: padding.left, y1: padding.top, y2: height - padding.bottom, class: "baseline" })
   );
 
-  let extremeIndex = 0;
   categories.forEach((c, i) => {
     const magnitude = Math.abs(c.total);
     const rowY = padding.top + i * rowHeight;
@@ -222,21 +213,15 @@ function renderCategoryChart(container, categories, onBarClick) {
     catLabel.textContent = c.category;
     svg.appendChild(catLabel);
 
-    if (magnitude > Math.abs(categories[extremeIndex].total)) extremeIndex = i;
+    const valueLabel = el("text", {
+      x: scaleX(magnitude) + 6,
+      y: rowY + rowHeight / 2 + 4,
+      "text-anchor": "start",
+      class: "value-label",
+    });
+    valueLabel.textContent = formatMoney(magnitude);
+    svg.appendChild(valueLabel);
   });
-
-  // Direct label only on the largest-magnitude category.
-  const extreme = categories[extremeIndex];
-  const extremeMagnitude = Math.abs(extreme.total);
-  const extremeRowY = padding.top + extremeIndex * rowHeight;
-  const extremeLabel = el("text", {
-    x: scaleX(extremeMagnitude) + 6,
-    y: extremeRowY + rowHeight / 2 + 4,
-    "text-anchor": "start",
-    class: "value-label",
-  });
-  extremeLabel.textContent = formatMoney(extremeMagnitude);
-  svg.appendChild(extremeLabel);
 
   container.appendChild(svg);
 }
@@ -295,11 +280,9 @@ async function fetchJSON(url) {
 
 let allMonths = [];
 
-// A category bar (e.g. "Train") may be a CATEGORY_GROUPS rollup —
-// GET .../categories/{name} comes back empty for an ordinary category
-// (nothing to expand) and non-empty for a group (its real members),
-// so the same click handler works for every bar without the frontend
-// needing to know in advance which ones are groups.
+// .../categories/{name} comes back empty for a non-group category, so
+// this same handler works on every bar without knowing in advance
+// which ones are groups.
 async function showGroupBreakdown(month, category) {
   const card = document.getElementById("subcategory-card");
   const members = await fetchJSON(`/api/months/${month}/categories/${encodeURIComponent(category)}`);
@@ -319,23 +302,19 @@ async function selectMonth(month) {
 
   const summary = allMonths.find((m) => m.month === month);
   document.getElementById("hero-month").textContent = formatMonthLabel(month);
-  document.getElementById("hero-value").textContent = formatMoney(summary.expenditure);
+  document.getElementById("hero-value").textContent = formatMoney(Math.abs(summary.expenditure));
   const separateEntries = Object.entries(summary.separate_totals || {});
   document.getElementById("hero-extra").textContent = separateEntries
-    .map(([cat, total]) => `${cat}: ${formatMoney(total)}`)
+    .map(([cat, total]) => `${cat}: ${formatMoney(Math.abs(total))}`)
     .join(", ");
 
-  // The previously selected group's breakdown no longer applies once
-  // the month changes.
-  document.getElementById("subcategory-card").hidden = true;
+  document.getElementById("subcategory-card").hidden = true; // stale for the old month
 
   const [categories, transactions] = await Promise.all([
     fetchJSON(`/api/months/${month}/categories`),
     fetchJSON(`/api/months/${month}/transactions`),
   ]);
-  // The API already excludes Income and SEPARATE_CATEGORIES (e.g.
-  // Stony Brook) from this endpoint — both stay visible in the hero
-  // figure above, just not on a chart they'd otherwise dominate.
+  // Income/Stony Brook already excluded server-side — still visible in the hero figure above.
   renderCategoryChart(document.getElementById("category-chart"), categories, (category) =>
     showGroupBreakdown(month, category)
   );
