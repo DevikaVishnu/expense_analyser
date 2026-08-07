@@ -19,6 +19,8 @@ Most personal finance tools (Mint, Copilot, Monarch) require linking your bank c
 PDF statement  --(parser)-->  Transaction  --(repository)-->  SQLite
 ```
 
+**→ [Interactive architecture diagram](https://devikavishnu.github.io/expense_analyser/architecture.html)** — click any component to open its source file.
+
 - **`expense_analyser/models.py`** — `Transaction`, the canonical schema every statement format gets normalized into. Amounts are stored as integer cents (never float — see `LEARNINGS.md`) to avoid rounding errors.
 - **`expense_analyser/parsers/base.py`** — `StatementParser`, an abstract base class. Each bank/card/document-format gets its own subclass that knows how to turn its specific PDF layout into a list of `Transaction`s. Nothing else in the system needs to know how any individual format is laid out.
 - **`expense_analyser/parsers/registry.py`** — `PARSER_REGISTRY`, mapping a folder-path key (e.g. `"IslandFederal_checking/bank_statement"`) to the parser class that understands it. Adding a new source means writing one new parser class and one registry entry — no other code changes.
@@ -53,7 +55,7 @@ e.g. `expense_reports/IslandFederal_checking/bank_statement/` and `expense_repor
 - [x] Web frontend (KPI tiles, category breakdown with icon badges, group sub-category breakdown, transaction table)
 - [x] Category editing wired into the frontend (reassignment dropdown, live PATCH)
 - [ ] Self-hostable packaging (Docker Compose) + phone access
-- [ ] Architecture diagram for the README (first attempt reverted — design didn't land, revisit)
+- [x] Interactive architecture diagram (clickable, links to source)
 
 ## Setup
 
