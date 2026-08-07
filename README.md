@@ -1,5 +1,8 @@
 # Expense Analyser
 
+[![Tests](https://github.com/DevikaVishnu/expense_analyser/actions/workflows/tests.yml/badge.svg)](https://github.com/DevikaVishnu/expense_analyser/actions/workflows/tests.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A personal finance tracker and analyser that ingests bank/credit-card statement PDFs, parses them into a normalized transaction history, and supports categorizing and analyzing spending — without handing your financial data to a third-party SaaS.
 
 ## Why this exists
