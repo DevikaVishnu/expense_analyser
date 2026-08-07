@@ -53,6 +53,7 @@ e.g. `expense_reports/IslandFederal_checking/bank_statement/` and `expense_repor
 - [x] Web frontend (KPI tiles, category breakdown with icon badges, group sub-category breakdown, transaction table)
 - [x] Category editing wired into the frontend (reassignment dropdown, live PATCH)
 - [ ] Self-hostable packaging (Docker Compose) + phone access
+- [ ] Architecture diagram for the README (first attempt reverted — design didn't land, revisit)
 
 ## Setup
 
