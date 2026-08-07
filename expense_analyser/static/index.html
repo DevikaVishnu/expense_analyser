@@ -7,35 +7,63 @@
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
-  <div class="page">
-    <h1>Expense Analyser</h1>
-    <p class="subtitle">Click a month to see its category breakdown and transactions.</p>
-
-    <div class="card">
-      <h2>Expenditure by month</h2>
-      <div id="month-chart"></div>
+  <div class="shell" id="shell">
+    <div class="nav">
+      <span class="logo">expense analyser</span>
+      <button class="dm-btn" id="dm-btn" type="button">Dark mode</button>
     </div>
 
-    <div class="card">
-      <h2 id="hero-month"></h2>
-      <p class="hero" id="hero-value"></p>
-      <p class="hero-extra" id="hero-extra"></p>
-    </div>
+    <div class="body">
+      <div class="sidebar">
+        <div class="s-lbl">Period</div>
+        <div id="sidebar-months"></div>
+      </div>
 
-    <div class="card">
-      <h2>Spend by category</h2>
-      <p class="subtitle" id="category-chart-hint">Click a bar to see its breakdown, if it has one.</p>
-      <div id="category-chart"></div>
-    </div>
+      <div class="content">
+        <div id="toast" class="toast"><span id="toast-msg"></span></div>
 
-    <div class="card" id="subcategory-card" hidden>
-      <h2 id="subcategory-heading"></h2>
-      <div id="subcategory-chart"></div>
-    </div>
+        <div class="kpis">
+          <div class="kpi">
+            <div class="kpi-lbl">Total spend</div>
+            <div class="kpi-val mono" id="k-spend">—</div>
+            <div class="kpi-sub" id="k-delta">—</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-lbl">Transactions</div>
+            <div class="kpi-val mono" id="k-tx">—</div>
+            <div class="kpi-sub">this period</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-lbl">Top category</div>
+            <div class="kpi-val" id="k-top" style="font-size: 14px; padding-top: 4px">—</div>
+            <div class="kpi-sub mono" id="k-top-a">—</div>
+          </div>
+        </div>
 
-    <div class="card">
-      <h2>Transactions</h2>
-      <div id="transaction-table"></div>
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title" id="cat-title">Categories</div>
+            <div class="card-hint">Click a row to see transactions</div>
+          </div>
+          <div id="cat-body"></div>
+        </div>
+
+        <div class="card" id="subgroup-card" style="display: none">
+          <div class="card-head">
+            <div class="card-title" id="subgroup-title">Breakdown</div>
+            <div class="card-hint">Net total per sub-category — a refund can outweigh the original charge</div>
+          </div>
+          <div id="subgroup-body"></div>
+        </div>
+
+        <div class="card" id="tx-card" style="display: none">
+          <div class="card-head">
+            <div class="card-title" id="tx-title">Transactions</div>
+            <div class="card-hint">Click the category pill to reassign</div>
+          </div>
+          <div id="tx-body"></div>
+        </div>
+      </div>
     </div>
   </div>
 
