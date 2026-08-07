@@ -14,7 +14,13 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 
-from expense_analyser.categorization import CATEGORY_GROUPS, INCOME_CATEGORY, SEPARATE_CATEGORIES, normalize_description
+from expense_analyser.categorization import (
+    CATEGORY_GROUPS,
+    INCOME_CATEGORY,
+    SEPARATE_CATEGORIES,
+    _known_categories,
+    normalize_description,
+)
 from expense_analyser.models import Transaction
 from expense_analyser.reporting import _apply_category_groups, _monthly_breakdown
 from expense_analyser.storage import TransactionRepository
@@ -56,6 +62,15 @@ def list_months(repo: TransactionRepository = Depends(get_repo)) -> list[MonthSu
         MonthSummary(month=month, expenditure=total, separate_totals=separate.get(month, {}))
         for month, total in sorted(expenditure.items())
     ]
+
+
+@app.get("/api/categories", response_model=list[str])
+def list_known_categories(repo: TransactionRepository = Depends(get_repo)) -> list[str]:
+    # _known_categories never includes group labels like "Train" in
+    # practice (nothing is ever stored with that literal category —
+    # see CATEGORY_GROUPS), but filter defensively anyway since a group
+    # name is never a valid reassignment target.
+    return [c for c in _known_categories(repo) if c not in CATEGORY_GROUPS]
 
 
 @app.get("/api/months/{month}/categories", response_model=list[CategoryTotal])
