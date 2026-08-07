@@ -1,38 +1,37 @@
-"""FastAPI backend serving transaction and spend-report data as JSON,
-plus the static frontend that consumes it.
-
-Mostly read-only: GET /api/months, GET /api/months/{month}/categories,
-and GET /api/months/{month}/transactions expose the same data the CLI
-reports already compute. The one write endpoint, PATCH
-/api/transactions/{transaction_id}, reuses the same update_category +
-set_merchant_rule pattern every CLI categorization tool already uses,
-so a category fixed here behaves identically — built but not yet
-wired into the frontend (view-only for this first pass).
+"""FastAPI backend + static frontend for the dashboard.
 
 Run with: uvicorn expense_analyser.api:app --reload
+Point at a non-default database with the EXPENSE_DB_PATH env var.
 """
 
+import os
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from contextlib import asynccontextmanager
 
 from expense_analyser.categorization import CATEGORY_GROUPS, INCOME_CATEGORY, SEPARATE_CATEGORIES, normalize_description
 from expense_analyser.models import Transaction
 from expense_analyser.reporting import _apply_category_groups, _monthly_breakdown
 from expense_analyser.storage import TransactionRepository
 
-DB_PATH = "expenses.db"
+DB_PATH = os.environ.get("EXPENSE_DB_PATH", "expenses.db")
 STATIC_DIR = Path(__file__).parent / "static"
 
-app = FastAPI(title="Expense Analyser API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.repo = TransactionRepository(DB_PATH)
+    yield
+    app.state.repo.connection.close()
 
+app = FastAPI(title="Expense Analyser API", lifespan=lifespan)
 
-def get_repo() -> TransactionRepository:
-    return TransactionRepository(DB_PATH)
+def get_repo(request: Request) -> TransactionRepository:
+    return request.app.state.repo
 
 
 class MonthSummary(BaseModel):
@@ -63,13 +62,9 @@ def list_months(repo: TransactionRepository = Depends(get_repo)) -> list[MonthSu
 def list_month_categories(
     month: str, repo: TransactionRepository = Depends(get_repo)
 ) -> list[CategoryTotal]:
-    # This endpoint's only consumer is the spend-by-category chart, so
-    # unlike the CLI reports (which deliberately show everything for
-    # review), it excludes INCOME_CATEGORY (not spend) and
-    # SEPARATE_CATEGORIES (real spend, but large/irregular enough that
-    # one bar dwarfs every other category and makes the chart useless).
-    # Both stay fully visible elsewhere — the hero figure, the CLI
-    # reports, and review_category.
+    # Chart-only: excludes Income (not spend) and SEPARATE_CATEGORIES
+    # (Stony Brook etc — real spend, but skews the chart). Still shown
+    # everywhere else (hero figure, CLI reports, review_category).
     excluded = {INCOME_CATEGORY, *SEPARATE_CATEGORIES}
     return [
         CategoryTotal(category=category or "Uncategorized", total=total)
@@ -82,10 +77,8 @@ def list_month_categories(
 def list_group_members(
     month: str, group: str, repo: TransactionRepository = Depends(get_repo)
 ) -> list[CategoryTotal]:
-    # Empty list (not a 404) for a name that isn't a CATEGORY_GROUPS
-    # group — the frontend uses "got nothing back" to mean "this bar
-    # isn't a group, don't show a sub-breakdown" rather than treating
-    # every ordinary category as an error case.
+    # Empty list, not 404, when it's not a real group — frontend treats
+    # "nothing back" as "no sub-breakdown for this bar".
     members = set(CATEGORY_GROUPS.get(group, []))
     if not members:
         return []

@@ -7,12 +7,12 @@ from expense_analyser.models import Transaction
 
 class TransactionRepository:
     def __init__(self, db_path: str):
-        # check_same_thread=False: sqlite3 connections are thread-bound
-        # by default. We never share one connection across genuinely
-        # concurrent access (each CLI run and each FastAPI request gets
-        # its own TransactionRepository), but FastAPI's TestClient
-        # dispatches requests on a different thread than the one that
-        # creates the repo in a test, which the default would reject.
+        # check_same_thread=False since TestClient hits this from a
+        # different thread than the one that created the repo. Fine —
+        # each CLI run gets its own repo instance, and the API's repo
+        # (one shared instance for the app's lifetime, see api.py's
+        # lifespan) only ever gets used from FastAPI's request-handling
+        # thread(s), never concurrently with the thread that created it.
         self.connection = sqlite3.connect(db_path, check_same_thread=False)
         self._create_tables()
 
@@ -92,11 +92,8 @@ class TransactionRepository:
         return results[0] if results else None
 
     def fetch_by_category(self, category: str) -> list[Transaction]:
-        # COLLATE NOCASE: category values are already casing-normalized
-        # on write (see categorization._resolve_category), but this
-        # keeps a lookup like "bank of america" from missing rows
-        # stored as "Bank of America" just because the CLI arg's case
-        # doesn't match exactly.
+        # COLLATE NOCASE so "bank of america" still matches rows stored
+        # as "Bank of America".
         return self._fetch(
             "SELECT * FROM transactions WHERE category = ? COLLATE NOCASE ORDER BY transaction_date",
             (category,),
