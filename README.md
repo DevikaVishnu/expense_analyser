@@ -41,21 +41,22 @@ e.g. `expense_reports/IslandFederal_checking/bank_statement/` and `expense_repor
 
 `expense_reports/` is gitignored — real statement PDFs never get committed. The SQLite database file (`*.db`) is gitignored too, since it holds your real parsed transaction data.
 
-## Status
+## Features
 
-- [x] `Transaction` model
-- [x] `StatementParser` interface + registry
-- [x] SQLite storage layer with idempotent inserts
-- [x] `IslandFederalStatementParser` (official bank statement format)
-- [ ] Parser for IslandFederal checking transaction-history export format
-- [x] Ingestion CLI
-- [x] Categorization CLI (with merchant-rule auto-suggestion)
-- [x] Spend analysis / reporting
-- [x] FastAPI backend (months, categories-by-month, transactions-by-month, category updates)
-- [x] Web frontend (KPI tiles, category breakdown with icon badges, group sub-category breakdown, transaction table)
-- [x] Category editing wired into the frontend (reassignment dropdown, live PATCH)
-- [ ] Self-hostable packaging (Docker Compose) + phone access
-- [x] Interactive architecture diagram (clickable, links to source)
+- `Transaction` model, with a `StatementParser` interface + registry for adding new banks without touching shared code
+- SQLite storage layer with idempotent inserts
+- `IslandFederalStatementParser` (official bank statement format)
+- Ingestion CLI
+- Categorization CLI, with merchant-rule auto-suggestion
+- Spend analysis / reporting (terminal + CSV export)
+- FastAPI backend — months, categories, group breakdowns, transactions, live category updates
+- Web dashboard — KPI tiles, category breakdown with icon badges, group sub-category breakdown, live category reassignment
+- Interactive architecture diagram (clickable, links straight to source)
+
+## Roadmap
+
+- Parser for the IslandFederal checking transaction-history export format (a second layout for an account already supported)
+- Self-hostable packaging (Docker Compose) for one-command startup + phone access
 
 ## Setup
 
