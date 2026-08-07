@@ -15,28 +15,9 @@ Most personal finance tools (Mint, Copilot, Monarch) require linking your bank c
 
 ## Architecture
 
-```mermaid
-flowchart TD
-    PDF["PDF statements<br/>expense_reports/&lt;account&gt;/&lt;type&gt;/*.pdf"]
-    REG["Parser registry<br/>parsers/registry.py"]
-    PARSE["StatementParser subclass<br/>parsers/*.py"]
-    REPO["TransactionRepository<br/>storage.py -> SQLite"]
-    CAT["Categorization CLI<br/>categorization.py"]
-    REP["Reporting CLI<br/>reporting.py -> CSV"]
-    API["FastAPI backend<br/>api.py"]
-    UI["Web dashboard<br/>static/"]
-
-    PDF -->|ingest.py| REG
-    REG --> PARSE
-    PARSE -->|Transaction, integer cents| REPO
-    REPO --> CAT
-    CAT -->|merchant rules + categories| REPO
-    REPO --> REP
-    REPO --> API
-    API -->|JSON| UI
 ```
-
-**→ [Interactive architecture diagram](https://devikavishnu.github.io/expense_analyser/architecture.html)** — click through each component and endpoint for more detail than fits here.
+PDF statement  --(parser)-->  Transaction  --(repository)-->  SQLite
+```
 
 - **`expense_analyser/models.py`** — `Transaction`, the canonical schema every statement format gets normalized into. Amounts are stored as integer cents (never float — see `LEARNINGS.md`) to avoid rounding errors.
 - **`expense_analyser/parsers/base.py`** — `StatementParser`, an abstract base class. Each bank/card/document-format gets its own subclass that knows how to turn its specific PDF layout into a list of `Transaction`s. Nothing else in the system needs to know how any individual format is laid out.
