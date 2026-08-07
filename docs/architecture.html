@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>expense_analyser — architecture</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f8f7f4;
+    --surface: #ffffff;
+    --surface2: #f2f1ee;
+    --border: #e2e0db;
+    --border2: #c8c5be;
+    --text1: #1a1916;
+    --text2: #5c5a55;
+    --text3: #9c9a94;
+    --accent: #1a6b3c;
+    --accent-bg: #edf5f0;
+    --accent-border: #a8d4b8;
+    --blue: #1a4a8a;
+    --blue-bg: #edf2f9;
+    --amber: #8a5a1a;
+    --amber-bg: #f9f2ed;
+    --purple: #5a1a8a;
+    --purple-bg: #f2edf9;
+    --radius: 8px;
+    --mono: 'SF Mono', ui-monospace, 'Cascadia Code', monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111210;
+      --surface: #1c1b18;
+      --surface2: #252420;
+      --border: #2e2d29;
+      --border2: #46443e;
+      --text1: #edecea;
+      --text2: #9c9a94;
+      --text3: #5c5a55;
+      --accent: #4caf76;
+      --accent-bg: #0f2318;
+      --accent-border: #1e5c34;
+      --blue: #6b9de8;
+      --blue-bg: #0f1d35;
+      --amber: #e8b46b;
+      --amber-bg: #2a1e0a;
+      --purple: #b46be8;
+      --purple-bg: #1e0a35;
+    }
+  }
+
+  html { background: var(--bg); color: var(--text1); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+  body { max-width: 860px; margin: 0 auto; padding: 48px 24px 80px; }
+
+  header { margin-bottom: 48px; }
+  .eyebrow { font-size: 11px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); margin-bottom: 10px; }
+  h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.5px; color: var(--text1); line-height: 1.2; }
+  .sub { font-size: 14px; color: var(--text2); margin-top: 8px; line-height: 1.6; }
+  .pill-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 16px; }
+  .pill { font-size: 11px; padding: 3px 9px; border-radius: 100px; border: 1px solid var(--border2); color: var(--text2); background: var(--surface); font-family: var(--mono); }
+
+  section { margin-bottom: 40px; }
+  .section-label { font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .flow { display: flex; flex-direction: column; gap: 0; }
+  .flow-row { display: flex; align-items: stretch; gap: 0; }
+  .flow-node {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    position: relative;
+  }
+  .flow-node:hover { border-color: var(--border2); background: var(--surface2); }
+  .flow-node.active { border-color: var(--accent); background: var(--accent-bg); }
+  .flow-node.blue.active { border-color: var(--blue); background: var(--blue-bg); }
+  .flow-node.amber.active { border-color: var(--amber); background: var(--amber-bg); }
+  .flow-node.purple.active { border-color: var(--purple); background: var(--purple-bg); }
+
+  .node-eyebrow { font-size: 10px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); margin-bottom: 5px; }
+  .node-title { font-size: 14px; font-weight: 600; color: var(--text1); }
+  .node-sub { font-size: 12px; color: var(--text2); margin-top: 3px; }
+  .node-file { font-size: 11px; font-family: var(--mono); color: var(--text3); margin-top: 8px; }
+  .flow-node.active .node-file { color: var(--accent); }
+  .flow-node.blue.active .node-file { color: var(--blue); }
+  .flow-node.amber.active .node-file { color: var(--amber); }
+  .flow-node.purple.active .node-file { color: var(--purple); }
+
+  .arrow-v { display: flex; justify-content: center; align-items: center; height: 32px; color: var(--text3); font-size: 18px; }
+  .arrow-h { display: flex; align-items: center; justify-content: center; width: 32px; flex-shrink: 0; color: var(--text3); font-size: 14px; }
+  .arrow-label { font-size: 10px; color: var(--text3); text-align: center; margin-top: -4px; margin-bottom: 4px; font-family: var(--mono); }
+
+  .detail {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 22px;
+    margin-top: 6px;
+    display: none;
+  }
+  .detail.open { display: block; }
+  .detail-title { font-size: 15px; font-weight: 600; color: var(--text1); margin-bottom: 10px; }
+  .detail-body { font-size: 13px; color: var(--text2); line-height: 1.7; }
+  .detail-body p { margin-bottom: 8px; }
+  .detail-body p:last-child { margin-bottom: 0; }
+  code { font-family: var(--mono); font-size: 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; color: var(--text1); }
+  .detail-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+  .tag { font-size: 11px; padding: 3px 9px; border-radius: 4px; font-family: var(--mono); }
+  .tag.green { background: var(--accent-bg); color: var(--accent); border: 1px solid var(--accent-border); }
+  .tag.blue { background: var(--blue-bg); color: var(--blue); border: 1px solid var(--border); }
+  .tag.amber { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--border); }
+  .tag.gray { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
+
+  .ep-list { display: flex; flex-direction: column; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .ep-row { display: grid; grid-template-columns: 56px 1fr auto; align-items: center; gap: 12px; padding: 12px 16px; background: var(--surface); cursor: pointer; transition: background 0.1s; }
+  .ep-row:hover { background: var(--surface2); }
+  .ep-row.open { background: var(--accent-bg); }
+  .method { font-size: 11px; font-weight: 600; font-family: var(--mono); padding: 2px 6px; border-radius: 4px; text-align: center; }
+  .get { background: var(--accent-bg); color: var(--accent); border: 1px solid var(--accent-border); }
+  .patch { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--border); }
+  .ep-path { font-size: 12px; font-family: var(--mono); color: var(--text1); }
+  .ep-desc { font-size: 12px; color: var(--text3); }
+  .ep-status { font-size: 10px; padding: 2px 7px; border-radius: 100px; font-weight: 500; }
+  .status-live { background: var(--accent-bg); color: var(--accent); border: 1px solid var(--accent-border); }
+  .status-wip { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--border); }
+  .ep-detail { background: var(--surface2); padding: 14px 16px; font-size: 12px; color: var(--text2); line-height: 1.7; border-top: 1px solid var(--border); display: none; }
+  .ep-detail.open { display: block; }
+  pre { font-family: var(--mono); font-size: 11px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin-top: 8px; overflow-x: auto; color: var(--text2); line-height: 1.6; white-space: pre; }
+
+  .decision-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 600px) { .decision-grid { grid-template-columns: 1fr; } }
+  .decision-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+  .decision-label { font-size: 10px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); margin-bottom: 6px; }
+  .decision-title { font-size: 13px; font-weight: 600; color: var(--text1); margin-bottom: 6px; }
+  .decision-body { font-size: 12px; color: var(--text2); line-height: 1.6; }
+
+  footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text3); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .footer-links { display: flex; gap: 16px; }
+  .footer-links a { color: var(--text3); text-decoration: none; }
+  .footer-links a:hover { color: var(--text1); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">expense_analyser</div>
+  <h1>Architecture overview</h1>
+  <p class="sub">A self-hosted personal finance tracker. Parses bank PDF statements, normalises transactions into SQLite, and serves a web dashboard — no third-party credentials required.</p>
+  <div class="pill-row">
+    <span class="pill">Python 3.11+</span>
+    <span class="pill">FastAPI</span>
+    <span class="pill">SQLite</span>
+    <span class="pill">pdfplumber</span>
+    <span class="pill">vanilla JS</span>
+  </div>
+</header>
+
+<section>
+  <div class="section-label">Data flow — click any component to expand</div>
+  <div class="flow">
+
+    <div class="flow-row">
+      <div class="flow-node blue" id="node-pdf" onclick="toggle('pdf')">
+        <div class="node-eyebrow">Input</div>
+        <div class="node-title">PDF statements</div>
+        <div class="node-sub">Bank &amp; credit card exports</div>
+        <div class="node-file">expense_reports/&lt;account&gt;/&lt;type&gt;/*.pdf</div>
+      </div>
+    </div>
+
+    <div class="arrow-v">↓</div>
+    <div class="arrow-label">ingest.py walks folder tree</div>
+
+    <div class="flow-row" style="gap:10px">
+      <div class="flow-node amber" id="node-registry" onclick="toggle('registry')" style="flex:0.8">
+        <div class="node-eyebrow">Router</div>
+        <div class="node-title">Parser registry</div>
+        <div class="node-sub">Maps folder key → parser class</div>
+        <div class="node-file">parsers/registry.py</div>
+      </div>
+      <div class="arrow-h">→</div>
+      <div class="flow-node" id="node-parser" onclick="toggle('parser')" style="flex:1.2">
+        <div class="node-eyebrow">Abstraction</div>
+        <div class="node-title">StatementParser (ABC)</div>
+        <div class="node-sub">One subclass per bank / format</div>
+        <div class="node-file">parsers/base.py · parsers/island_federal.py</div>
+      </div>
+    </div>
+
+    <div class="arrow-v">↓</div>
+    <div class="arrow-label">list[Transaction] — amounts as integer cents</div>
+
+    <div class="flow-row">
+      <div class="flow-node" id="node-storage" onclick="toggle('storage')">
+        <div class="node-eyebrow">Persistence</div>
+        <div class="node-title">TransactionRepository</div>
+        <div class="node-sub">Idempotent inserts via INSERT OR IGNORE + dedup_hash</div>
+        <div class="node-file">storage.py → expenses.db (SQLite)</div>
+      </div>
+    </div>
+
+    <div class="arrow-v">↓</div>
+    <div class="arrow-label">merchant rules · categories · amounts</div>
+
+    <div class="flow-row" style="gap:10px">
+      <div class="flow-node purple" id="node-cat" onclick="toggle('cat')">
+        <div class="node-eyebrow">CLI tool</div>
+        <div class="node-title">Categorization</div>
+        <div class="node-sub">Merchant rules, review, recategorize</div>
+        <div class="node-file">categorization.py</div>
+      </div>
+      <div class="arrow-h" style="color:transparent">·</div>
+      <div class="flow-node amber" id="node-report" onclick="toggle('report')">
+        <div class="node-eyebrow">CLI tool</div>
+        <div class="node-title">Reporting</div>
+        <div class="node-sub">CSV exports, monthly totals</div>
+        <div class="node-file">reporting.py → reports/*.csv</div>
+      </div>
+    </div>
+
+    <div class="arrow-v">↓</div>
+    <div class="arrow-label">JSON — amounts as integer cents, never floats</div>
+
+    <div class="flow-row">
+      <div class="flow-node blue" id="node-api" onclick="toggle('api')">
+        <div class="node-eyebrow">Backend</div>
+        <div class="node-title">FastAPI</div>
+        <div class="node-sub">REST endpoints · auto /docs · async · uvicorn</div>
+        <div class="node-file">api.py · localhost:8000</div>
+      </div>
+    </div>
+
+    <div class="arrow-v">↓</div>
+    <div class="arrow-label">fetch() — GET months/categories/transactions · PATCH category</div>
+
+    <div class="flow-row">
+      <div class="flow-node" id="node-ui" onclick="toggle('ui')">
+        <div class="node-eyebrow">Frontend</div>
+        <div class="node-title">Web dashboard</div>
+        <div class="node-sub">Vanilla JS · no framework, no build step</div>
+        <div class="node-file">static/index.html · app.js · style.css</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="detail" id="detail-panel">
+    <div class="detail-title" id="detail-title"></div>
+    <div class="detail-body" id="detail-body"></div>
+    <div class="detail-tags" id="detail-tags"></div>
+  </div>
+</section>
+
+<section>
+  <div class="section-label">API endpoints</div>
+  <div class="ep-list">
+
+    <div>
+      <div class="ep-row" onclick="toggleEp(0)">
+        <span class="method get">GET</span>
+        <span class="ep-path">/api/months</span>
+        <span class="ep-status status-live">live</span>
+      </div>
+      <div class="ep-detail" id="ep-0">
+        Returns all months with expenditure totals. Income and <code>SEPARATE_CATEGORIES</code> (e.g. tuition) excluded from the headline figure but still present as separate keys.
+        <pre>[{ "month": "2026-07", "expenditure": -52878, "separate_totals": { "Stony Brook": -180000 } }]</pre>
+      </div>
+    </div>
+
+    <div>
+      <div class="ep-row" onclick="toggleEp(1)">
+        <span class="method get">GET</span>
+        <span class="ep-path">/api/categories</span>
+        <span class="ep-status status-live">live</span>
+      </div>
+      <div class="ep-detail" id="ep-1">
+        Every known category — the fixed list plus anything ever actually assigned to a transaction (including free-text categories typed via the CLI). Backs the frontend's reassignment dropdown, so it never drifts out of sync with what the CLI knows.
+        <pre>["Eat Out", "Groceries", "Uber", "Online purchases", "Medicines", "Miscellaneous", "Subway", "Amtrak", "LIRR", ...]</pre>
+      </div>
+    </div>
+
+    <div>
+      <div class="ep-row" onclick="toggleEp(2)">
+        <span class="method get">GET</span>
+        <span class="ep-path">/api/months/{month}/categories</span>
+        <span class="ep-status status-live">live</span>
+      </div>
+      <div class="ep-detail" id="ep-2">
+        Per-category spend for one month. <code>CATEGORY_GROUPS</code> (e.g. Train = Subway + Amtrak + LIRR) rolled into one row. Income excluded — would dwarf routine categories in the chart.
+        <pre>[{ "category": "Train", "total": 700 }, { "category": "Groceries", "total": -29905 }]</pre>
+      </div>
+    </div>
+
+    <div>
+      <div class="ep-row" onclick="toggleEp(3)">
+        <span class="method get">GET</span>
+        <span class="ep-path">/api/months/{month}/categories/{group}</span>
+        <span class="ep-status status-live">live</span>
+      </div>
+      <div class="ep-detail" id="ep-3">
+        Real members inside a <code>CATEGORY_GROUP</code>, each with its own net total. Returns an empty array <code>[]</code> for a non-group category. Surfaces the case where one member nets positive (a refund outweighing its charge) even though the group as a whole reads as routine spend.
+        <pre>[{ "category": "Subway", "total": -11400 }, { "category": "Amtrak", "total": 12100 }]</pre>
+      </div>
+    </div>
+
+    <div>
+      <div class="ep-row" onclick="toggleEp(4)">
+        <span class="method get">GET</span>
+        <span class="ep-path">/api/months/{month}/transactions</span>
+        <span class="ep-status status-live">live</span>
+      </div>
+      <div class="ep-detail" id="ep-4">
+        All transactions for a month. Amounts always integer cents, sign preserved — formatting (and whether to show sign) is a frontend concern, same convention as the Stripe API.
+        <pre>{ "id": "8357a96c-...", "transaction_date": "2026-07-13", "description": "WHOLE FOODS MARKET", "amount": -8743, "category": "Groceries" }</pre>
+      </div>
+    </div>
+
+    <div>
+      <div class="ep-row" onclick="toggleEp(5)">
+        <span class="method patch">PATCH</span>
+        <span class="ep-path">/api/transactions/{id}</span>
+        <span class="ep-status status-live">live</span>
+      </div>
+      <div class="ep-detail" id="ep-5">
+        Updates a transaction's category and persists the merchant rule — every future transaction from this merchant auto-applies the new category, same as the CLI's categorization flow. Wired into the dashboard's category-reassignment dropdown.
+        <pre>// Request body
+{ "category": "Dining" }</pre>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section>
+  <div class="section-label">Key design decisions</div>
+  <div class="decision-grid">
+
+    <div class="decision-card">
+      <div class="decision-label">Money representation</div>
+      <div class="decision-title">Integer cents, never floats</div>
+      <div class="decision-body">IEEE 754 can't exactly represent most base-10 fractions. Amounts enter as <code>Decimal(string)</code>, multiply ×100, then <code>int()</code>. Never touches a float at any stage. Same convention as Stripe.</div>
+    </div>
+
+    <div class="decision-card">
+      <div class="decision-label">Extensibility</div>
+      <div class="decision-title">Parser registry pattern</div>
+      <div class="decision-body">Adding a new bank = one new <code>StatementParser</code> subclass + one dict entry. The ingestion pipeline never changes. No growing if/elif chain.</div>
+    </div>
+
+    <div class="decision-card">
+      <div class="decision-label">Data safety</div>
+      <div class="decision-title">Idempotent inserts</div>
+      <div class="decision-body">Re-ingesting overlapping PDFs is safe — <code>INSERT OR IGNORE</code> + a <code>UNIQUE</code> constraint on <code>dedup_hash</code>. No pre-check query needed.</div>
+    </div>
+
+    <div class="decision-card">
+      <div class="decision-label">Privacy</div>
+      <div class="decision-title">Fully self-hosted</div>
+      <div class="decision-body">PDF statements and <code>expenses.db</code> are gitignored. No credentials sent anywhere, no third-party SaaS in the loop. Runs entirely on your own machine via <code>uvicorn</code> today — Docker Compose packaging is on the roadmap, not yet built.</div>
+    </div>
+
+  </div>
+</section>
+
+<footer>
+  <span>expense_analyser · self-hosted personal finance</span>
+  <div class="footer-links">
+    <a href="../README.md">← README</a>
+    <a href="https://github.com/DevikaVishnu/expense_analyser">GitHub repo</a>
+    <a href="../LEARNINGS.md">LEARNINGS.md</a>
+  </div>
+</footer>
+
+<script>
+const details = {
+  pdf: {
+    title: 'PDF statements',
+    body: `<p>Bank and credit card statements dropped into <code>expense_reports/&lt;account_id&gt;/&lt;doc_type&gt;/</code>. The folder path is the routing key — <code>IslandFederal_checking/bank_statement</code> maps to one parser, <code>IslandFederal_checking/transaction_history</code> to another.</p><p>The entire <code>expense_reports/</code> directory is gitignored. Your financial data never leaves your machine.</p>`,
+    tags: [['gray','gitignored'],['gray','pdfplumber'],['blue','any bank format']]
+  },
+  registry: {
+    title: 'Parser registry',
+    body: `<p><code>PARSER_REGISTRY</code> is a plain dict mapping a folder-path string to a <code>StatementParser</code> subclass. The ingestion CLI looks up the right parser for each folder it walks.</p><p>Adding a new bank requires zero changes to ingestion code — just a new subclass and one new dict entry. This is the open/closed principle in practice.</p>`,
+    tags: [['amber','parsers/registry.py'],['gray','open/closed principle'],['gray','extensible']]
+  },
+  parser: {
+    title: 'StatementParser (Abstract Base Class)',
+    body: `<p>An ABC with one abstract method: <code>parse(pdf_path) → list[Transaction]</code>. Python's <code>ABC</code> + <code>@abstractmethod</code> enforces the contract at instantiation time — a subclass that forgets to implement <code>parse()</code> raises <code>TypeError</code> immediately, not later when ingestion calls it.</p><p>Each bank subclass handles that bank's specific PDF layout. Nothing else in the system knows or cares about PDF structure.</p>`,
+    tags: [['gray','parsers/base.py'],['gray','ABC'],['green','IslandFederalStatementParser']]
+  },
+  storage: {
+    title: 'TransactionRepository',
+    body: `<p>A thin wrapper around SQLite. Every insert uses <code>INSERT OR IGNORE</code> against a <code>UNIQUE</code> constraint on <code>dedup_hash</code> — a content hash of the transaction's fields. Re-running ingestion on overlapping statements is completely safe.</p><p>Amounts are stored as <code>INTEGER</code> cents. The schema is minimal — no ORM, just <code>sqlite3</code> directly.</p>`,
+    tags: [['gray','storage.py'],['gray','SQLite'],['green','idempotent'],['gray','no ORM']]
+  },
+  cat: {
+    title: 'Categorization CLI',
+    body: `<p>The interactive CLI that assigns merchant rules. First time a merchant appears, you're asked. After that, every transaction from that merchant is auto-categorised — including refunds, which share the original description.</p><p><code>--recategorize</code> bulk-fixes a merchant rule. <code>--review-month</code> and <code>--review-category</code> let you inspect and fix any month or category interactively.</p>`,
+    tags: [['purple','categorization.py'],['gray','merchant rules'],['gray','CLI']]
+  },
+  report: {
+    title: 'Reporting',
+    body: `<p>Generates spend-by-category, spend-by-month, and spend-by-month-and-category reports. Printed to terminal and exported to <code>reports/*.csv</code>. <code>CATEGORY_GROUPS</code> roll sub-categories into one line (Subway + Amtrak + LIRR → Train).</p><p>The monthly headline excludes Income and <code>SEPARATE_CATEGORIES</code> (large irregular items like tuition) — they still appear as their own rows.</p>`,
+    tags: [['amber','reporting.py'],['gray','CSV export'],['gray','CATEGORY_GROUPS']]
+  },
+  api: {
+    title: 'FastAPI backend',
+    body: `<p>Six endpoints: five GETs (months, known categories, per-month categories, group members, transactions) plus one PATCH to update a transaction's category. Amounts always return as integer cents, sign preserved on individual transactions — formatting is the frontend's job.</p><p>The <code>/docs</code> endpoint gives you a free interactive API explorer. Run with <code>uvicorn expense_analyser.api:app --reload</code>; <code>EXPENSE_DB_PATH</code> points it at a non-default database.</p>`,
+    tags: [['blue','api.py'],['blue','FastAPI'],['gray','async'],['gray','auto /docs']]
+  },
+  ui: {
+    title: 'Web dashboard (vanilla JS)',
+    body: `<p>No framework, no build step. A month sidebar, KPI tiles (total spend, transaction count, top category), and a category list with colorblind-safe icon badges and neutral-fill percentage bars — colour is never the only way a value is shown.</p><p>Clicking a group category (e.g. "Train") shows each real sub-category's net total before the raw transaction list, since a refund can outweigh its original charge and make a group's total look inconsistent otherwise. Clicking a transaction's category pill reassigns it live via the PATCH endpoint.</p>`,
+    tags: [['gray','static/'],['gray','vanilla JS'],['green','category editing live'],['gray','no charting library']]
+  }
+};
+
+let activeNode = null;
+
+function toggle(key) {
+  const panel = document.getElementById('detail-panel');
+  const d = details[key];
+  const nodeEl = document.getElementById('node-' + key);
+
+  if (activeNode === key) {
+    panel.classList.remove('open');
+    nodeEl.classList.remove('active');
+    activeNode = null;
+    return;
+  }
+
+  document.querySelectorAll('.flow-node').forEach(n => n.classList.remove('active'));
+  nodeEl.classList.add('active');
+  activeNode = key;
+
+  document.getElementById('detail-title').textContent = d.title;
+  document.getElementById('detail-body').innerHTML = d.body;
+  document.getElementById('detail-tags').innerHTML = d.tags.map(([cls, label]) =>
+    `<span class="tag ${cls}">${label}</span>`
+  ).join('');
+
+  panel.classList.add('open');
+}
+
+function toggleEp(i) {
+  const detail = document.getElementById('ep-' + i);
+  const row = detail.previousElementSibling;
+  const isOpen = detail.classList.contains('open');
+  document.querySelectorAll('.ep-detail').forEach(d => d.classList.remove('open'));
+  document.querySelectorAll('.ep-row').forEach(r => r.classList.remove('open'));
+  if (!isOpen) {
+    detail.classList.add('open');
+    row.classList.add('open');
+  }
+}
+</script>
+
+</body>
+</html>
